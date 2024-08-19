@@ -7,14 +7,14 @@ import os
 import sys
 import time
 from shutil import copy, copytree
-
+from sklearn.metrics import confusion_matrix
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from data.nuscenes_dataloader import TrainDatasetMultiSeq
+from data.nuscenes_dataloader import TrainDatasetMultiSeq, DatasetSingleSeq
 from model import MotionNet
 
 
@@ -55,7 +55,7 @@ pred_adj_frame_distance = True  # Whether to predict the relative offset between
 height_feat_size = 13  # The size along the height dimension
 cell_category_num = 5  # The number of object categories (including the background)
 
-out_seq_len = 20  # The number of future frames we are going to predict
+out_seq_len = 5  # The number of future frames we are going to predict
 trans_matrix_idx = (
     1  # Among N transformation matrices (N=2 in our experiment), which matrix is used for alignment (see paper)
 )
@@ -64,6 +64,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "-d", "--data", default=None, type=str, help="The path to the preprocessed sparse BEV training data"
 )
+parser.add_argument(
+    "-e", "--evaldata", default=None, type=str, help="The path to preprocessed sparse BEV val data"
+)
+
 parser.add_argument(
     "--resume", default="", type=str, help="The path to the saved model that is loaded to resume training"
 )
@@ -84,7 +88,7 @@ parser.add_argument("--use_sc", action="store_true", help="Whether to use spatia
 parser.add_argument("--nn_sampling", action="store_true", help="Whether to use nearest neighbor sampling in bg_tc loss")
 parser.add_argument("--log", action="store_true", help="Whether to log")
 parser.add_argument("--logpath", default="", help="The path to the output log file")
-
+parser.add_argument("--gpu", default="7")
 args = parser.parse_args()
 print(args)
 
@@ -92,6 +96,7 @@ need_log = args.log
 BATCH_SIZE = args.batch
 num_epochs = args.nepoch
 num_workers = args.nworker
+os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
 reg_weight_bg_tc = args.reg_weight_bg_tc  # The weight of background temporal consistency term
 reg_weight_fg_tc = args.reg_weight_fg_tc  # The weight of foreground temporal consistency term
@@ -103,6 +108,12 @@ use_spatial_consistency = args.use_sc
 
 use_nn_sampling = args.nn_sampling
 
+voxel_size = (0.25, 0.25, 0.4)
+# area_extents = np.array([[-32.0, 32.0], [-32.0, 32.0], [-3.0, 2.0]])
+# area_extents = np.array([[0, 64.0], [-32.0, 32.0], [0, 5.0]])
+area_extents = np.array([[0., 64.], [-32., 32.], [-2., 3.]])
+h, w, c = (area_extents[:, 1] - area_extents[:, 0]).astype(np.float32)/voxel_size
+h, w, c = int(h), int(w), int(c)
 
 def main():
     start_epoch = 1
@@ -128,7 +139,7 @@ def main():
 
             # Copy the code files as logs
             copytree("nuscenes-devkit", os.path.join(model_save_path, "nuscenes-devkit"))
-            copytree("data", os.path.join(model_save_path, "data"))
+            # copytree("data", os.path.join(model_save_path, "data"))
             python_files = [f for f in os.listdir(".") if f.endswith(".py")]
             for f in python_files:
                 copy(f, model_save_path)
@@ -150,19 +161,26 @@ def main():
     device_num = torch.cuda.device_count()
     print("device number", device_num)
 
-    voxel_size = (0.25, 0.25, 0.4)
-    area_extents = np.array([[-32.0, 32.0], [-32.0, 32.0], [-3.0, 2.0]])
-
+    
     trainset = TrainDatasetMultiSeq(
         dataset_root=args.data,
         future_frame_skip=0,
         voxel_size=voxel_size,
         area_extents=area_extents,
         num_category=cell_category_num,
+        num_future_frames=5,
     )
 
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=BATCH_SIZE, shuffle=True, num_workers=num_workers)
     print("Training dataset size:", len(trainset))
+
+    # evalset
+    tmp = args.evaldata
+    evalset_split = tmp.split('/')[-1] if tmp.split('/')  else tmp.split('/')[-2]
+    evalset = DatasetSingleSeq(dataset_root = args.evaldata, split=evalset_split, future_frame_skip=0,
+                                voxel_size=voxel_size, area_extents=area_extents, num_category=cell_category_num)
+
+    evalloader = torch.utils.data.DataLoader(evalset, batch_size=1, shuffle=False, num_workers=num_workers)
 
     model = MotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
     model = nn.DataParallel(model)
@@ -172,7 +190,7 @@ def main():
         criterion = nn.SmoothL1Loss(reduction="none")
     else:
         criterion = nn.SmoothL1Loss(reduction="sum")
-    optimizer = optim.Adam(model.parameters(), lr=0.0016)
+    optimizer = optim.Adam(model.parameters(), lr=0.0032)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 20, 30, 40], gamma=0.5)
 
     if args.resume != "":
@@ -199,14 +217,22 @@ def main():
             model, criterion, trainloader, optimizer, device, epoch
         )
 
+        # eval the model
+        model.eval()
+        # TODO: eval function
+        # me_static, me_slow, me_fast, cat_map, mean_cat, pixel_acc = \
+        #     eval_motion_displacement(model=model, dataloader=evalloader, dataset=evalset, device=device)
+        me_static, me_slow, me_fast, pixel_acc = 0,0,0,0
         if need_log:
-            saver.write(
-                "{}\t{}\t{}\t{}\t{}\t{}\n".format(loss_disp, loss_class, loss_motion, loss_bg_tc, loss_fg_tc, loss_sc)
-            )
+            saver.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(loss_disp, loss_class, loss_motion, loss_bg_tc,
+                                                          loss_fg_tc, loss_sc))
+            saver.write("me_static: {}\t me_slow: {}\t me_fast: {}\n".format(me_static, me_slow, me_fast))
+            saver.write("pixel acc: {}\n".format(pixel_acc))
             saver.flush()
 
         # save model
-        if need_log and (epoch % 5 == 0 or epoch == num_epochs or epoch == 1 or epoch > 20):
+        # if need_log and (epoch % 5 == 0 or epoch == num_epochs or epoch == 1 or epoch > 45):
+        if need_log and (epoch % 10 == 0 or epoch == 1):
             save_dict = {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
@@ -243,7 +269,8 @@ def train(model, criterion, trainloader, optimizer, device, epoch):
         ) = data
 
         # Move to GPU/CPU
-        padded_voxel_points = padded_voxel_points.view(-1, num_past_frames[0].item(), 256, 256, height_feat_size)
+        # padded_voxel_points = padded_voxel_points.view(-1, num_past_frames[0].item(), 256, 256, height_feat_size)
+        padded_voxel_points = padded_voxel_points.view(-1, num_past_frames[0].item(), h, w, height_feat_size)
         padded_voxel_points = padded_voxel_points.to(device)
 
         # Make prediction
@@ -303,6 +330,258 @@ def train(model, criterion, trainloader, optimizer, device, epoch):
         running_loss_fg_tc,
     )
 
+# eval function
+def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_path=None, use_adj_frame_pred=True,
+                             future_frame_skip=0,
+                             num_future_sweeps=20, batch_size=1, use_motion_state_pred_masking=True,
+                             general_flag = False):
+    """
+    Evaluate the motion prediction results.
+
+    """
+
+    # Specify the file for storing the evaluation results
+    
+    
+    # The speed intervals for grouping the cells
+    # speed_intervals = np.array([[0.0, 0.0], [0, 5.0], [5.0, 20.0]])  # unit: m/s
+    # We do not consider > 20m/s, since objects in nuScenes appear inside city and rarely exhibit very high speed
+    speed_intervals = np.array([[0.0, 0.0], [0, 5.0], [5.0, 20.0]])
+    selected_future_sweeps = np.arange(0, num_future_sweeps + 1, 3 + 1)  # We evaluate predictions at [0.2, 0.4, ..., 1]s
+    selected_future_sweeps = selected_future_sweeps[1:]
+    last_future_sweep_id = selected_future_sweeps[-1]
+    distance_intervals = speed_intervals * (last_future_sweep_id / 20.0)  # "20" is because the LIDAR scanner is 20Hz
+
+    cell_groups = list()  # grouping the cells with different speeds
+    for i in range(distance_intervals.shape[0]):
+        cell_statistics = list()
+
+        for j in range(len(selected_future_sweeps)):
+            # corresponds to each row, which records the MSE, median etc.
+            cell_statistics.append([])
+        cell_groups.append(cell_statistics)
+
+    # Make prediction
+
+    pixel_acc = 0  # for computing mean pixel classification accuracy
+    overall_cls_pred = list()  # to compute classification accuracy for each object category
+    overall_cls_gt = list()  # to compute classification accuracy for each object category
+
+    for i, data in enumerate(dataloader, 0):
+        padded_voxel_points, all_disp_field_gt, all_valid_pixel_maps, \
+            non_empty_map, pixel_cat_map_gt, past_steps, future_steps, motion_gt = data
+
+        padded_voxel_points = padded_voxel_points.to(device)
+
+        if general_flag:
+            # segment
+            pixel_cat_map_gt_numpy = pixel_cat_map_gt.numpy()
+            non_empty_map_numpy = non_empty_map.numpy()
+            # class_pred_numpy = class_pred.cpu().numpy()
+
+            # Convert the category map
+            max_prob = np.amax(pixel_cat_map_gt_numpy, axis=-1)
+            filter_mask = max_prob == 1.0  # Note: some of the cell probabilities are soft probabilities
+            pixel_cat_map_numpy = np.argmax(pixel_cat_map_gt_numpy, axis=-1) + 1  # category starts from 1 (background), etc
+
+            # Convert category label to nongernal label
+            cat_nongeneral_map = np.zeros_like(pixel_cat_map_numpy)
+            cat_nongeneral_map[pixel_cat_map_numpy == 5] = 1
+
+        with torch.no_grad():
+            disp_pred, class_pred, motion_pred = model(padded_voxel_points)
+            
+
+            pred_shape = disp_pred.size()
+            disp_pred = disp_pred.view(all_disp_field_gt.size(0), -1, pred_shape[-3], pred_shape[-2], pred_shape[-1])
+            disp_pred = disp_pred.contiguous()
+            disp_pred = disp_pred.cpu().numpy()
+
+            if use_adj_frame_pred:
+                for c in range(1, disp_pred.shape[1]):
+                    disp_pred[:, c, ...] = disp_pred[:, c, ...] + disp_pred[:, c - 1, ...]
+
+            if use_motion_state_pred_masking:
+                motion_pred_numpy = motion_pred.cpu().numpy()
+                motion_pred_numpy = np.argmax(motion_pred_numpy, axis=1)
+                mask = motion_pred_numpy == 0
+
+                class_pred_numpy = class_pred.cpu().numpy()
+                class_pred_cat = np.argmax(class_pred_numpy, axis=1)
+                class_mask = class_pred_cat == 0  # background mask
+
+                # For those with very small movements, we consider them as static
+                last_pred = disp_pred[:, -1, :, :, :]
+                last_pred_norm = np.linalg.norm(last_pred, ord=2, axis=1)  # out: (batch, h, w)
+                thd_mask = last_pred_norm <= 0.2
+
+                cat_weight_map = np.ones_like(class_pred_cat, dtype=np.float32)
+                cat_weight_map[mask] = 0.0
+                cat_weight_map[class_mask] = 0.0
+                cat_weight_map[thd_mask] = 0.0
+                cat_weight_map = cat_weight_map[:, np.newaxis, np.newaxis, ...]  # (batch, 1, 1, h, w)
+
+                disp_pred = disp_pred * cat_weight_map
+                if general_flag:
+                    disp_pred = disp_pred * cat_nongeneral_map
+
+        # Pre-processing
+        all_disp_field_gt = all_disp_field_gt.numpy()  # (bs, seq, h, w, channel)
+        future_steps = future_steps.numpy()[0]
+
+        valid_pixel_maps = all_valid_pixel_maps[:, -future_steps:, ...].contiguous()
+        valid_pixel_maps = valid_pixel_maps.numpy()
+
+        all_disp_field_gt = all_disp_field_gt[:, -future_steps:, ]
+        all_disp_field_gt = np.transpose(all_disp_field_gt, (0, 1, 4, 2, 3))
+        all_disp_field_gt_norm = np.linalg.norm(all_disp_field_gt, ord=2, axis=2)
+
+        # -----------------------------------------------------------------------------------
+        # Compute the evaluation metrics
+        # First, compute the displacement prediction error;
+        # Compute the static and moving cell masks, and
+        # Iterate through the distance intervals and group the cells based on their speeds;
+        upper_thresh = 0.2
+        upper_bound = (future_frame_skip + 1) / 20 * upper_thresh
+
+        static_cell_mask = all_disp_field_gt_norm <= upper_bound
+        static_cell_mask = np.all(static_cell_mask, axis=1)  # along the temporal axis
+        moving_cell_mask = np.logical_not(static_cell_mask)
+
+        for j, d in enumerate(distance_intervals):
+            for slot, s in enumerate((selected_future_sweeps - 1)):  # selected_future_sweeps: [4, 8, ...]
+                curr_valid_pixel_map = valid_pixel_maps[:, s]
+
+                if j == 0:  # corresponds to static cells
+                    curr_mask = np.logical_and(curr_valid_pixel_map, static_cell_mask)
+                else:
+                    # We use the displacement between keyframe and the last sample frame as metrics
+                    last_gt_norm = all_disp_field_gt_norm[:, -1]
+                    mask = np.logical_and(d[0] <= last_gt_norm, last_gt_norm < d[1])
+
+                    curr_mask = np.logical_and(curr_valid_pixel_map, mask)
+                    curr_mask = np.logical_and(curr_mask, moving_cell_mask)
+
+                # Since in nuScenes (with 32-line LiDAR) the points (cells) in the distance are very sparse,
+                # we evaluate the performance for cells within the range [-30m, 30m] along both x, y dimensions.
+                border = 8
+                '''
+                qka 20240313 np.bool --> bool
+                '''
+                roi_mask = np.zeros_like(curr_mask, dtype=bool)
+                roi_mask[:, border:-border, border:-border] = True
+                curr_mask = np.logical_and(curr_mask, roi_mask)
+
+                cell_idx = np.where(curr_mask == True)
+
+                if general_flag:
+                    all_disp_field_gt = all_disp_field_gt * cat_nongeneral_map
+
+                gt = all_disp_field_gt[:, s]
+                pred = disp_pred[:, s]
+                norm_error = np.linalg.norm(gt - pred, ord=2, axis=1)
+
+                cell_groups[j][slot].append(norm_error[cell_idx])
+
+        # -----------------------------------------------------------------------------------
+        # Second, compute the classification accuracy
+        pixel_cat_map_gt_numpy = pixel_cat_map_gt.numpy()
+        non_empty_map_numpy = non_empty_map.numpy()
+        class_pred_numpy = class_pred.cpu().numpy()
+
+        # Convert the category map
+        max_prob = np.amax(pixel_cat_map_gt_numpy, axis=-1)
+        filter_mask = max_prob == 1.0  # Note: some of the cell probabilities are soft probabilities
+        pixel_cat_map_numpy = np.argmax(pixel_cat_map_gt_numpy, axis=-1) + 1  # category starts from 1 (background), etc
+        '''
+        qka 20240313 np.int ---> int
+        '''
+        pixel_cat_map_numpy = (pixel_cat_map_numpy * non_empty_map_numpy * filter_mask).astype(int)
+
+        class_pred_numpy = np.transpose(class_pred_numpy, (0, 2, 3, 1))
+        class_pred_numpy = np.argmax(class_pred_numpy, axis=-1) + 1
+        class_pred_numpy = (class_pred_numpy * non_empty_map_numpy * filter_mask).astype(int)
+
+        border = 8
+        roi_mask = np.zeros_like(non_empty_map_numpy)
+        roi_mask[:, border:-border, border:-border] = 1.0
+
+        tmp = pixel_cat_map_numpy == class_pred_numpy
+        denominator = np.sum(non_empty_map_numpy * filter_mask * roi_mask)
+        pixel_acc += np.sum(tmp * non_empty_map_numpy * filter_mask * roi_mask) / denominator
+
+        # For computing confusion matrix, in order to compute classification accuracy for each category
+        count_mask = non_empty_map_numpy * filter_mask * roi_mask
+        idx_fg = np.where(count_mask > 0)
+
+        overall_cls_gt.append(pixel_cat_map_numpy[idx_fg])
+        overall_cls_pred.append(class_pred_numpy[idx_fg])
+
+        print("Finish sample [{}/{}]".format(i + 1, int(np.ceil(len(dataset) / float(batch_size)))))
+
+    # Compute the statistics
+    dump_res = []
+
+    # Compute the statistics of displacement prediction error
+    me_list = np.zeros([3])
+    for i, d in enumerate(speed_intervals):
+        group = cell_groups[i]
+        print("--------------------------------------------------------------")
+        print("For cells within speed range [{}, {}]:\n".format(d[0], d[1]))
+        # if save_eval_file_path is not None:
+        #     saver.write("--------------------------------------------------------------\n")
+        #     saver.write("For cells within speed range [{}, {}]:\n\n".format(d[0], d[1]))
+
+        dump_error = []
+        dump_error_quantile_50 = []
+
+        for s in range(len(selected_future_sweeps)):
+            row = group[s]
+
+            errors = np.concatenate(row) if len(row) != 0 else row
+
+            if len(errors) == 0:
+                mean_error = None
+                error_quantile_50 = None
+            else:
+                mean_error = np.average(errors)
+                error_quantile_50 = np.quantile(errors, 0.5)
+
+            dump_error.append(mean_error)
+            dump_error_quantile_50.append(error_quantile_50)
+
+            msg = "Frame {}:\nThe mean error is {}\nThe 50% error quantile is {}".\
+                format(selected_future_sweeps[s], mean_error, error_quantile_50)
+            print(msg)
+        me_list[i] = mean_error
+        print("--------------------------------------------------------------\n")
+        # if save_eval_file_path is not None:
+        #     saver.write("--------------------------------------------------------------\n\n")
+
+        dump_res.append(dump_error + dump_error_quantile_50)
+
+    # Compute the statistics of mean pixel classification accuracy
+    pixel_acc = pixel_acc / len(dataset)
+    print("Mean pixel classification accuracy: {}".format(pixel_acc))
+    # if save_eval_file_path is not None:
+    #     saver.write("Mean pixel classification accuracy: {}\n".format(pixel_acc))
+
+    # Compute the mean classification accuracy for each object category
+    overall_cls_gt = np.concatenate(overall_cls_gt)
+    overall_cls_pred = np.concatenate(overall_cls_pred)
+    cm = confusion_matrix(overall_cls_gt, overall_cls_pred)
+    cm_sum = np.sum(cm, axis=1)
+    mean_cat = cm[np.arange(5), np.arange(5)] / cm_sum
+    cat_map = {0: 'Bg', 1: 'Vehicle', 2: 'Ped', 3: 'Bike', 4: 'Others'}
+    for i in range(len(mean_cat)):
+        print("mean cat accuracy of {}: {}".format(cat_map[i], mean_cat[i]))
+    print("mean instance acc: ", np.mean(mean_cat))
+    # if save_eval_file_path is not None:
+    #     for i in range(len(mean_cat)):
+    #         saver.write("mean cat accuracy of {}: {}\n".format(cat_map[i], mean_cat[i]))
+    #     saver.write("mean instance acc: {}\n".format(np.mean(mean_cat)))
+
+    return me_list[0], me_list[1], me_list[2], cat_map, mean_cat, pixel_acc
 
 # Compute and back-propagate the loss
 def compute_and_bp_loss(
@@ -324,12 +603,12 @@ def compute_and_bp_loss(
     optimizer.zero_grad()
 
     # Compute the displacement loss
-    all_disp_field_gt = all_disp_field_gt.view(-1, future_frames_num, 256, 256, 2)
+    all_disp_field_gt = all_disp_field_gt.view(-1, future_frames_num, h, w, 2)
     gt = all_disp_field_gt[:, -future_frames_num:, ...].contiguous()
     gt = gt.view(-1, gt.size(2), gt.size(3), gt.size(4))
     gt = gt.permute(0, 3, 1, 2).to(device)
 
-    all_valid_pixel_maps = all_valid_pixel_maps.view(-1, future_frames_num, 256, 256)
+    all_valid_pixel_maps = all_valid_pixel_maps.view(-1, future_frames_num, h, w)
     valid_pixel_maps = all_valid_pixel_maps[:, -future_frames_num:, ...].contiguous()
     valid_pixel_maps = valid_pixel_maps.view(-1, valid_pixel_maps.size(2), valid_pixel_maps.size(3))
     valid_pixel_maps = torch.unsqueeze(valid_pixel_maps, 1)
@@ -363,7 +642,7 @@ def compute_and_bp_loss(
 
     # ---------------------------------------------------------------------
     # -- Compute the masked displacement loss
-    pixel_cat_map_gt = pixel_cat_map_gt.view(-1, 256, 256, cell_category_num)
+    pixel_cat_map_gt = pixel_cat_map_gt.view(-1, h, w, cell_category_num)
 
     if use_weighted_loss:  # Note: have also tried focal loss, but did not observe noticeable improvement
         pixel_cat_map_gt_numpy = pixel_cat_map_gt.numpy()
@@ -379,14 +658,15 @@ def compute_and_bp_loss(
         map_shape = cat_weight_map.size()
 
         loss_disp = criterion(gt * valid_pixel_maps, disp_pred * valid_pixel_maps)
-        loss_disp = loss_disp.view(map_shape[0], -1, map_shape[-3], map_shape[-2], map_shape[-1])
+        # loss_disp = loss_disp.view(map_shape[0], -1, map_shape[-3], map_shape[-2], map_shape[-1])
+        loss_disp = loss_disp.reshape(map_shape[0], -1, map_shape[-3], map_shape[-2], map_shape[-1])
         loss_disp = torch.sum(loss_disp * cat_weight_map) / valid_pixel_num
     else:
         loss_disp = criterion(gt * valid_pixel_maps, disp_pred * valid_pixel_maps) / valid_pixel_num
 
     # ---------------------------------------------------------------------
     # -- Compute the grid cell classification loss
-    non_empty_map = non_empty_map.view(-1, 256, 256)
+    non_empty_map = non_empty_map.view(-1, h, w)
     non_empty_map = non_empty_map.to(device)
     pixel_cat_map_gt = pixel_cat_map_gt.permute(0, 3, 1, 2).to(device)
 
@@ -402,7 +682,7 @@ def compute_and_bp_loss(
 
     # ---------------------------------------------------------------------
     # -- Compute the speed level classification loss
-    motion_gt = motion_gt.view(-1, 256, 256, 2)
+    motion_gt = motion_gt.view(-1, h, w, 2)
     motion_gt_numpy = motion_gt.numpy()
     motion_gt = motion_gt.permute(0, 3, 1, 2).to(device)
     log_softmax_motion_pred = F.log_softmax(motion_pred, dim=1)

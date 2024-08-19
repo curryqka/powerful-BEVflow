@@ -124,7 +124,7 @@ class TrainDatasetMultiSeq(Dataset):
             num_past_pcs = self.num_past_frames
             for i in range(num_past_pcs):
                 indices = gt_dict["voxel_indices_" + str(i)]
-                curr_voxels = np.zeros(dims, dtype=np.bool)
+                curr_voxels = np.zeros(dims, dtype=bool)
                 curr_voxels[indices[:, 0], indices[:, 1], indices[:, 2]] = 1
                 padded_voxel_points.append(curr_voxels)
             padded_voxel_points = np.stack(padded_voxel_points, 0).astype(np.float32)
@@ -176,6 +176,8 @@ class DatasetSingleSeq(Dataset):
         dataset_root=None,
         split="train",
         future_frame_skip=0,
+        num_past_frames=5,
+        num_future_frames=20,
         voxel_size=(0.25, 0.25, 0.4),
         area_extents=np.array([[-32.0, 32.0], [-32.0, 32.0], [-3.0, 2.0]]),
         num_category=5,
@@ -199,15 +201,24 @@ class DatasetSingleSeq(Dataset):
         self.dataset_root = dataset_root
         print("data root:", dataset_root)
 
-        seq_dirs = [
-            os.path.join(self.dataset_root, d)
-            for d in os.listdir(self.dataset_root)
-            if os.path.isfile(os.path.join(self.dataset_root, d))
-        ]
+        # seq_dirs = [
+        #     os.path.join(self.dataset_root, d)
+        #     for d in os.listdir(self.dataset_root)
+        #     if os.path.isfile(os.path.join(self.dataset_root, d))
+        # ]
         # seq_files = [os.path.join(seq_dir, f) for seq_dir in seq_dirs for f in os.listdir(seq_dir)
         #              if os.path.isfile(os.path.join(seq_dir, f))]
-
-        self.seq_files = seq_dirs
+       
+        seq_dirs = []
+        if split == 'train':
+            for d in os.listdir(self.dataset_root):
+                tmp_0 = os.path.join(self.dataset_root, d) + '/0.npy'
+                seq_dirs.append(tmp_0)
+        else:
+            for d in os.listdir(self.dataset_root):
+                tmp_0 = os.path.join(self.dataset_root, d) + '/0.npy'
+                seq_dirs.append(tmp_0)
+        self.seq_files = seq_dirs[::1]
         self.num_sample_seqs = len(self.seq_files)
         print("The number of {} sequences: {}".format(split, self.num_sample_seqs))
 
@@ -224,7 +235,7 @@ class DatasetSingleSeq(Dataset):
         self.area_extents = area_extents
         self.num_category = num_category
         self.future_frame_skip = future_frame_skip
-
+        self.num_past_frames = num_past_frames
         manager = Manager()
         self.cache = manager.dict()
         self.cache_size = cache_size if split == "train" else 0
@@ -246,6 +257,8 @@ class DatasetSingleSeq(Dataset):
         dims = gt_dict["3d_dimension"]
         num_future_pcs = gt_dict["num_future_pcs"]
         num_past_pcs = gt_dict["num_past_pcs"]
+
+        num_past_pcs = self.num_past_frames
         pixel_indices = gt_dict["pixel_indices"]
 
         sparse_disp_field_gt = gt_dict["disp_field"]
@@ -266,7 +279,7 @@ class DatasetSingleSeq(Dataset):
         padded_voxel_points = list()
         for i in range(num_past_pcs):
             indices = gt_dict["voxel_indices_" + str(i)]
-            curr_voxels = np.zeros(dims, dtype=np.bool)
+            curr_voxels = np.zeros(dims, dtype=bool)
             curr_voxels[indices[:, 0], indices[:, 1], indices[:, 2]] = 1
             padded_voxel_points.append(curr_voxels)
         padded_voxel_points = np.stack(padded_voxel_points, 0).astype(np.float32)
