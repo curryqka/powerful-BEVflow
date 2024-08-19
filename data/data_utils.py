@@ -168,6 +168,7 @@ def point_in_hull_fast_He(points: np.array, bounding_box: HeBox):
     return idx
 '''
 
+'''
 def calc_displace_vector_He(points: np.array, curr_box: HeBox, next_box: HeBox):
     """
     Calculate the displacement vectors for the input points.
@@ -199,6 +200,43 @@ def calc_displace_vector_He(points: np.array, curr_box: HeBox, next_box: HeBox):
 
     return pc_displace_vectors
 
+'''
+
+def calc_displace_vector_He(points: np.array, curr_box, next_box):
+    """
+    Calculate the displacement vectors for the input points.
+    This is achieved by comparing the current and next bounding boxes. Specifically, we first rotate
+    the input points according to the delta rotation angle, and then translate them. Finally we compute the
+    displacement between the transformed points and the input points.
+
+    :param points: The input points, (N x d). Note that these points should be inside the current bounding box.
+    :param curr_box: Current bounding box described with center, size, and yaw.
+    :param next_box: The future next bounding box in the temporal sequence described with center, size, and yaw.
+    :return: Displacement vectors for the points.
+    """
+    assert points.shape[1] == 3, "The input points should have dimension 3."
+
+    # Calculate delta rotation using yaw angles
+    curr_rotation_matrix = yaw_to_rotation_matrix(curr_box.orientation)
+    next_rotation_matrix = yaw_to_rotation_matrix(next_box.orientation)
+    delta_rotation_matrix = next_rotation_matrix @ curr_rotation_matrix.T
+
+    # Rotate points
+    rotated_pc = (delta_rotation_matrix @ points.T).T
+
+    # Calculate rotated current center
+    rotated_curr_center = np.dot(delta_rotation_matrix, curr_box.center)
+
+    # Calculate delta center
+    delta_center = next_box.center - rotated_curr_center
+
+    # Apply translation
+    rotated_translated_pc = rotated_pc + delta_center
+
+    # Compute displacement vectors
+    pc_displace_vectors = rotated_translated_pc - points
+
+    return pc_displace_vectors
 def get_static_and_moving_cells(batch_disp_field_gt, upper_thresh=0.1, frame_skip=3):
     """
     Get the indices/masks of static and moving cells. Ths speed of static cells is bounded by upper_thresh.
