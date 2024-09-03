@@ -14,11 +14,15 @@ class LidarPointCloud(ABC):
     Abstract class for a point cloud.
     """
 
-    def __init__(self, points:np.array):
+    def __init__(self, points:np.array, sensor_type = "at128_0"):
         """
         Initialize a point cloud
         """
-        assert points.shape[0] == self.nbr_dims(), 'Error: Point cloud should have {} dimensions.'.format(self.nbr_dims())
+        self.sensor_type = sensor_type
+        if sensor_type == 'at128_0':
+            assert points.shape[0] == self.nbr_dims(), 'Error: Point cloud should have {} dimensions.'.format(self.nbr_dims())
+        else:
+            assert points.shape[0] == self.nbr_dims() + 1, 'Error: Point cloud should have {} dimensions.'.format(self.nbr_dims())
         self.points = points
 
     # def __init__(self, points):
@@ -62,8 +66,11 @@ class LidarPointCloud(ABC):
         """
 
         # Initialize
-        points = np.zeros((cls.nbr_dims(), 0))
-        all_pc = cls(points)
+        if dataset.sensor_type == 'at128_0':
+            points = np.zeros((cls.nbr_dims(), 0))
+        else:
+            points = np.zeros((cls.nbr_dims() + 1, 0))
+        all_pc = cls(points, sensor_type=dataset.sensor_type)
         all_times = np.zeros((1, 0))
         trans_matrix_list = list()
 
@@ -84,7 +91,13 @@ class LidarPointCloud(ABC):
         # Aggregate current and past sweeps
         for k in range(nsweeps_back):
             timestamp = timestamps[nsweeps_back - 1 - k]
-            current_pc = cls.from_file(dataset.get_pointcloud_path(scene_name, timestamp))
+
+            if dataset.sensor_type == 'wt128_0':
+                current_pc = cls.from_file(dataset.get_pointcloud_path(scene_name, timestamp), \
+                    dataset.get_pointcloudV_path(scene_name, timestamp), dataset=dataset)
+            else:
+                current_pc = cls.from_file(dataset.get_pointcloud_path(scene_name, timestamp), \
+                    dataset=dataset)
 
             current_pose_rec_path = dataset.get_pose(scene_name, timestamp)
             current_pose_rec = dataset.read_pose_data_v2(current_pose_rec_path, return_quat=False)
@@ -96,8 +109,7 @@ class LidarPointCloud(ABC):
             # car_from_current = transform_matrix(current_cs_rec['translation'], current_cs_rec['rotation'], inverse=False)
 
             # Fuse four transformation matrices into one and perform transform
-            # trans_matrix = reduce(np.dot, [ref_from_global, global_from_current])
-            trans_matrix = np.dot(ref_from_global, global_from_current)
+            trans_matrix = reduce(np.dot, [ref_from_global, global_from_current])
             current_pc.transform(trans_matrix)
 
             # Collect the transformation matrix
@@ -115,7 +127,13 @@ class LidarPointCloud(ABC):
         # Aggregate the future sweeps
         for k in range(nsweeps_forward):
             timestamp = timestamps[nsweeps_back + k]
-            current_pc = cls.from_file(dataset.get_pointcloud_path(scene_name, timestamp))
+
+            if dataset.sensor_type == 'wt128_0':
+                current_pc = cls.from_file(dataset.get_pointcloud_path(scene_name, timestamp), \
+                    dataset.get_pointcloudV_path(scene_name, timestamp), dataset)
+            else:
+                current_pc = cls.from_file(dataset.get_pointcloud_path(scene_name, timestamp), \
+                    dataset=dataset)
 
             current_pose_rec_path = dataset.get_pose(scene_name, timestamp)
             current_pose_rec = dataset.read_pose_data_v2(current_pose_rec_path, return_quat=False)
@@ -307,24 +325,7 @@ class LidarPointCloud(ABC):
 
         return box_list, np.array(all_times), attr_list, cat_list
 
-    # @classmethod
-    # def from_file(cls, file_path):
-    #     # This method should be implemented to load point cloud data from a file
-    #     pass
 
-    # @classmethod
-    # def nbr_dims(cls):
-    #     # This method should return the number of dimensions in the point cloud
-    #     return 4
-
-
-    # def transform(self, trans_matrix):
-    #     # Apply the transformation matrix to the points
-    #     self.points = np.dot(trans_matrix, np.vstack((self.points[:3, :], np.ones((1, self.points.shape[1])))))[:3, :]
-
-    # def remove_close(self, min_distance):
-    #     # Remove points that are closer than min_distance
-    #     return
     def nbr_points(self) -> int:
         """
         Returns the number of points.
@@ -384,10 +385,11 @@ class HeLidarPointCloud(LidarPointCloud):
         Returns the number of dimensions.
         :return: Number of dimensions.
         """
+
         return 4
 
     @classmethod
-    def from_file(cls, file_name: str) -> 'HeLidarPointCloud':
+    def from_file(cls, file_name: str, vel_file_name=None, dataset:CustomDataset = None) -> 'HeLidarPointCloud':
         """
         Loads LIDAR data from binary numpy format. Data is stored as (x, y, z, intensity, ring index).
         :param file_name: Path of the pointcloud file on disk.
@@ -396,10 +398,21 @@ class HeLidarPointCloud(LidarPointCloud):
 
         assert file_name.endswith('.bin'), 'Unsupported filetype {}'.format(file_name)
 
-        scan = np.fromfile(file_name, dtype=np.float32)
-        points = scan.reshape((-1, 4))[:, :cls.nbr_dims()]
-        # points = scan.reshape((128, 1200, -1))[:, :, :cls.nbr_dims()]
-        return cls(points.T)
+        if dataset.sensor_type == "at128_0":
+            scan = np.fromfile(file_name, dtype=np.float32)
+            points = scan.reshape((-1, 4))[:, :cls.nbr_dims()]
+            # points = scan.reshape((128, 1200, -1))[:, :, :cls.nbr_dims()]
+            return cls(points.T)
+        elif dataset.sensor_type == "wt128_0":
+            scan = np.fromfile(file_name, dtype=np.float32)
+            points = scan.reshape((-1, 4))[:, :cls.nbr_dims()]
+            # points = scan.reshape((128, 1200, -1))[:, :, :cls.nbr_dims()]
+            vel_scan = np.fromfile(vel_file_name, dtype=np.float32)
+            vel = vel_scan.reshape((-1, 1))[:, :1]
+
+            points = np.concatenate((points, vel), axis=1)
+
+            return cls(points.T, sensor_type="wt128_0")
 
 class Box:
     """
@@ -675,3 +688,54 @@ class Box:
                  (int(center_bottom[0]), int(center_bottom[1])),
                  (int(center_bottom_forward[0]), int(center_bottom_forward[1])),
                  colors[0][::-1], linewidth)
+
+
+"""
+Add new code to process the FMCW lidar data.
+"""
+def calculate_voxel_speed(padded_voxel_points, unique_indices, num_points_in_voxel, \
+                            points, num_T, seed):
+    """
+    Calculate the speed of each voxel in the padded voxel points.
+    params:
+        padded_voxel_points: padded voxel points
+        unique_indices: unique indices of the voxel points
+        num_points_in_voxel: number of points in each voxel
+        points: original points
+        num_T: number of max points in each voxel
+    """
+    if seed is not None:
+        np.random.seed(seed)
+    voxel_speeds = np.zeros((unique_indices.shape[0], 1), dtype=np.float32)
+    for i, v in enumerate(zip(unique_indices, num_points_in_voxel)):
+        if v[1] < num_T:
+            voxel_speeds = np.mean(points[v[0]:v[0]+v[1], 4], axis = 0)
+        else:
+            inds = np.random.choice(v[1], num_T)
+            voxel_speeds[i, :] = np.mean(points[v[0]+inds, 4], axis = 0)
+    return voxel_speeds
+
+def calculate_voxel_direction(padded_voxel_points, unique_indices, num_points_in_voxel, \
+                            points, num_T, seed):
+    """
+    Calculate the direction of each voxel in the padded voxel points.
+    """
+    if seed is not None:
+        np.random.seed(seed)
+    # save the direction of each voxel
+    voxel_directions = np.zeros((unique_indices.shape[0], 3), dtype=np.float32)
+
+    for i, v in enumerate(zip(unique_indices, num_points_in_voxel)):
+        if v[1] < num_T:
+            direction_vectors = points[v[0]:v[0] + v[1], :3]
+        else:
+            inds = np.random.choice(v[1], num_T)
+            direction_vectors = points[v[0] + inds, :3]
+
+        # calculate the direction of each voxel [0,0,0]
+        directions = direction_vectors
+        norm = np.linalg.norm(direction, axis=1, keepdims=True)
+        norm_directions = directions / np.where(norm == 0, 1, norm)
+
+        voxel_directions[i, :] = np.mean(norm_directions, axis=0)
+    return voxel_directions

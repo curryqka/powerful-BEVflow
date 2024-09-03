@@ -55,7 +55,7 @@ pred_adj_frame_distance = True  # Whether to predict the relative offset between
 height_feat_size = 13  # The size along the height dimension
 cell_category_num = 5  # The number of object categories (including the background)
 
-out_seq_len = 5  # The number of future frames we are going to predict
+out_seq_len = 10  # The number of future frames we are going to predict
 trans_matrix_idx = (
     1  # Among N transformation matrices (N=2 in our experiment), which matrix is used for alignment (see paper)
 )
@@ -220,9 +220,10 @@ def main():
         # eval the model
         model.eval()
         # TODO: eval function
-        # me_static, me_slow, me_fast, cat_map, mean_cat, pixel_acc = \
-        #     eval_motion_displacement(model=model, dataloader=evalloader, dataset=evalset, device=device)
-        me_static, me_slow, me_fast, pixel_acc = 0,0,0,0
+        me_static, me_slow, me_fast, pixel_acc = \
+            eval_motion_displacement(model=model, dataloader=evalloader, dataset=evalset, device=device, \
+                                    num_future_sweeps=5)
+        # me_static, me_slow, me_fast, pixel_acc = 0,0,0,0
         if need_log:
             saver.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(loss_disp, loss_class, loss_motion, loss_bg_tc,
                                                           loss_fg_tc, loss_sc))
@@ -347,7 +348,8 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
     # speed_intervals = np.array([[0.0, 0.0], [0, 5.0], [5.0, 20.0]])  # unit: m/s
     # We do not consider > 20m/s, since objects in nuScenes appear inside city and rarely exhibit very high speed
     speed_intervals = np.array([[0.0, 0.0], [0, 5.0], [5.0, 20.0]])
-    selected_future_sweeps = np.arange(0, num_future_sweeps + 1, 3 + 1)  # We evaluate predictions at [0.2, 0.4, ..., 1]s
+    # selected_future_sweeps = np.arange(0, num_future_sweeps + 1, 3 + 1)  # We evaluate predictions at [0.2, 0.4, ..., 1]s
+    selected_future_sweeps = np.arange(0, num_future_sweeps + 1, future_frame_skip + 1)
     selected_future_sweeps = selected_future_sweeps[1:]
     last_future_sweep_id = selected_future_sweeps[-1]
     distance_intervals = speed_intervals * (last_future_sweep_id / 20.0)  # "20" is because the LIDAR scanner is 20Hz
@@ -571,17 +573,19 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
     overall_cls_pred = np.concatenate(overall_cls_pred)
     cm = confusion_matrix(overall_cls_gt, overall_cls_pred)
     cm_sum = np.sum(cm, axis=1)
-    mean_cat = cm[np.arange(5), np.arange(5)] / cm_sum
-    cat_map = {0: 'Bg', 1: 'Vehicle', 2: 'Ped', 3: 'Bike', 4: 'Others'}
-    for i in range(len(mean_cat)):
-        print("mean cat accuracy of {}: {}".format(cat_map[i], mean_cat[i]))
-    print("mean instance acc: ", np.mean(mean_cat))
+
+    # cell_cls_num = 2
+    # mean_cat = cm[np.arange(cell_cls_num), np.arange(cell_cls_num)] / cm_sum
+    # cat_map = {0: 'Bg', 1: 'Vehicle', 2: 'Ped', 3: 'Bike', 4: 'Others'}
+    # for i in range(len(mean_cat)):
+    #     print("mean cat accuracy of {}: {}".format(cat_map[i], mean_cat[i]))
+    # print("mean instance acc: ", np.mean(mean_cat))
     # if save_eval_file_path is not None:
     #     for i in range(len(mean_cat)):
     #         saver.write("mean cat accuracy of {}: {}\n".format(cat_map[i], mean_cat[i]))
     #     saver.write("mean instance acc: {}\n".format(np.mean(mean_cat)))
 
-    return me_list[0], me_list[1], me_list[2], cat_map, mean_cat, pixel_acc
+    return me_list[0], me_list[1], me_list[2], pixel_acc
 
 # Compute and back-propagate the loss
 def compute_and_bp_loss(

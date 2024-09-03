@@ -1,7 +1,7 @@
 export PYTHONPATH=/home/qiankangan/MotionNet:$PYTHONPATH
 export PYTHONPATH=/home/qiankangan/MotionNet/nuscenes-devkit/python-sdk:$PYTHONPATH
 OMP_NUM_THREADS=1 python train_multi_seq.py --data /mnt/personal/qiankangan/at128_0/train --evaldata /mnt/personal/qiankangan/at128_0/train \
---batch 32 --nepoch 300 --nworker 2  --log --gpu "0" \
+--batch 32 --nepoch 100 --nworker 2  --log --logpath /home/qiankangan/logs/at128_0v1 --gpu "0" \
 --use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 2.0 
 
 OMP_NUM_THREADS=1 python train_multi_seq.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \

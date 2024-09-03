@@ -218,7 +218,7 @@ class DatasetSingleSeq(Dataset):
             for d in os.listdir(self.dataset_root):
                 tmp_0 = os.path.join(self.dataset_root, d) + '/0.npy'
                 seq_dirs.append(tmp_0)
-        self.seq_files = seq_dirs[::1]
+        self.seq_files = seq_dirs[::10]
         self.num_sample_seqs = len(self.seq_files)
         print("The number of {} sequences: {}".format(split, self.num_sample_seqs))
 

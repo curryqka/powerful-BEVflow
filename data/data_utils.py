@@ -11,7 +11,6 @@ from pyquaternion import Quaternion
 from numba import njit
 import random
 import pickle,json
-from HeTools.He_utils import yaw_to_rotation_matrix
 from scipy.spatial.transform import Rotation as R
 
 def point_in_hull_slow(point, hull, tolerance=1e-12):
@@ -84,7 +83,19 @@ def calc_displace_vector(points: np.array, curr_box: Box, next_box: Box):
     pc_displace_vectors = rotated_tranlated_pc - points
 
     return pc_displace_vectors
-
+def yaw_to_rotation_matrix(yaw):
+    """
+    Convert yaw angle to 3x3 rotation matrix.
+    :param yaw: Yaw angle in radians.
+    :return: 3x3 rotation matrix.
+    """
+    cos_yaw = np.cos(yaw)[0]
+    sin_yaw = np.sin(yaw)[0]
+    return np.array([
+        [cos_yaw, -sin_yaw, 0],
+        [sin_yaw,  cos_yaw, 0],
+        [0,        0,       1]
+    ])
 
 def point_in_hull_fast_He(points: np.array, bounding_box):
     """
@@ -168,40 +179,6 @@ def point_in_hull_fast_He(points: np.array, bounding_box: HeBox):
     return idx
 '''
 
-'''
-def calc_displace_vector_He(points: np.array, curr_box: HeBox, next_box: HeBox):
-    """
-    Calculate the displacement vectors for the input points.
-    This is achieved by comparing the current and next bounding boxes. Specifically, we first rotate
-    the input points according to the delta rotation angle, and then translate them. Finally we compute the
-    displacement between the transformed points and the input points.
-    :param points: The input points, (N x d). Note that these points should be inside the current bounding box.
-    :param curr_box: Current bounding box.
-    :param next_box: The future next bounding box in the temporal sequence.
-    :return: Displacement vectors for the points.
-    """
-    assert points.shape[1] == 3, "The input points should have dimension 3."
-
-    # Make sure the quaternions are normalized
-    # curr_box.orientation = curr_box.orientation.normalised
-    # next_box.orientation = next_box.orientation.normalised
-
-    delta_yaw = next_box.orientation - curr_box.orientation
-    delta_rotation_matrix = Quaternion(axis=[0, 0, 1], radians=delta_yaw).rotation_matrix
-
-    # delta_rotation = curr_box.orientation.inverse * next_box.orientation
-    rotated_pc = (delta_rotation_matrix @ points.T).T
-    rotated_curr_center = np.dot(delta_rotation_matrix, curr_box.center)
-    delta_center = next_box.center - rotated_curr_center
-
-    rotated_tranlated_pc = rotated_pc + delta_center
-
-    pc_displace_vectors = rotated_tranlated_pc - points
-
-    return pc_displace_vectors
-
-'''
-
 def calc_displace_vector_He(points: np.array, curr_box, next_box):
     """
     Calculate the displacement vectors for the input points.
@@ -237,6 +214,38 @@ def calc_displace_vector_He(points: np.array, curr_box, next_box):
     pc_displace_vectors = rotated_translated_pc - points
 
     return pc_displace_vectors
+'''
+def calc_displace_vector_He(points: np.array, curr_box: HeBox, next_box: HeBox):
+    """
+    Calculate the displacement vectors for the input points.
+    This is achieved by comparing the current and next bounding boxes. Specifically, we first rotate
+    the input points according to the delta rotation angle, and then translate them. Finally we compute the
+    displacement between the transformed points and the input points.
+    :param points: The input points, (N x d). Note that these points should be inside the current bounding box.
+    :param curr_box: Current bounding box.
+    :param next_box: The future next bounding box in the temporal sequence.
+    :return: Displacement vectors for the points.
+    """
+    assert points.shape[1] == 3, "The input points should have dimension 3."
+
+    # Make sure the quaternions are normalized
+    # curr_box.orientation = curr_box.orientation.normalised
+    # next_box.orientation = next_box.orientation.normalised
+
+    delta_yaw = next_box.orientation - curr_box.orientation
+    delta_rotation_matrix = Quaternion(axis=[0, 0, 1], radians=delta_yaw).rotation_matrix
+
+    # delta_rotation = curr_box.orientation.inverse * next_box.orientation
+    rotated_pc = (delta_rotation_matrix @ points.T).T
+    rotated_curr_center = np.dot(delta_rotation_matrix, curr_box.center)
+    delta_center = next_box.center - rotated_curr_center
+
+    rotated_tranlated_pc = rotated_pc + delta_center
+
+    pc_displace_vectors = rotated_tranlated_pc - points
+
+    return pc_displace_vectors
+'''
 def get_static_and_moving_cells(batch_disp_field_gt, upper_thresh=0.1, frame_skip=3):
     """
     Get the indices/masks of static and moving cells. Ths speed of static cells is bounded by upper_thresh.
@@ -972,7 +981,15 @@ def gen_2d_grid_gt_He(data_dict: dict, grid_size: np.array, extents: np.array = 
     else:
         return all_disp_field_gt_list, all_valid_pixel_maps_list, non_empty_map, pixel_cat_map, pixel_indices
 
-def voxelize_occupy(pts, voxel_size, extents=None, return_indices=False):
+def gen_2d_pixel_velocity(pts, refer_pc_idx_per_bbox):
+    """
+    Compute the 2D pixel velocity for each point in the point cloud.
+    The input for the voxelization is expected to be a PointCloud
+    with N points in 5 dimension (x,y,z,i,v). Voxel size is the quantization size for the voxel grid.
+    """
+    pass
+
+def voxelize_occupy(pts, voxel_size, extents=None, return_indices=False, sensor_type='at128_0'):
     """
     Voxelize the input point cloud. We only record if a given voxel is occupied or not, which is just binary indicator.
 
@@ -996,9 +1013,13 @@ def voxelize_occupy(pts, voxel_size, extents=None, return_indices=False):
     VOXEL_EMPTY = 0
     VOXEL_FILLED = 1
 
-    # Check if points are 3D, otherwise early exit
-    if pts.shape[1] < 3 or pts.shape[1] > 4:
-        raise ValueError("Points have the wrong shape: {}".format(pts.shape))
+    if sensor_type == 'at128_0':
+        # Check if points are 3D, otherwise early exit
+        if pts.shape[1] < 3 or pts.shape[1] > 4:
+            raise ValueError("Points have the wrong shape: {}".format(pts.shape))
+    else:
+        if pts.shape[1] < 4 or pts.shape[1] > 5:
+            raise ValueError("Points have the wrong shape: {}".format(pts.shape))
 
     if extents is not None:
         if extents.shape != (3, 2):
@@ -1059,6 +1080,134 @@ def voxelize_occupy(pts, voxel_size, extents=None, return_indices=False):
         return leaf_layout, voxel_indices
     else:
         return leaf_layout
+
+def voxelize_with_velocity(pts, voxel_size, extents=None, return_indices=False, top_k=1):
+    """
+    Voxelize the input point cloud and calculate velocity and direction for each voxel.
+    params pts: point cloud as N x [x, y, z, i, v]
+    params voxel_size: Quantization size for the grid,
+    params extents: Optional, specifies the full extents of the point cloud.
+                    Used for creating same sized voxel grids. Shape (3, 2)
+    params return_indices: Whether to return the non-empty voxel indices.
+    return:
+        velocity: (num_divisions[0], num_divisions[1], num_divisions[2], )
+        direction: (num_divisions[0], num_divisions[1], num_divisions[2], 1)
+        cos: (num_divisions[0], num_divisions[1], num_divisions[2], 3)
+        indices: (num_divisions[0], num_divisions[1], num_divisions[2], )
+    """
+    # check if points are 5D
+    if pts.shape[1] < 5 or pts.shape[1] > 6:
+        raise ValueError("Points have the wrong shape: {}".format(pts.shape))
+
+    # Apply extents filter if provided
+    if extents is not None:
+        if extents.shape!= (3, 2):
+            raise ValueError("Extents are the wrong shape {}".format(extents.shape))
+            filter_idx = np.where( (extents[0, 0] < pts[:, 0]) & (pts[:, 0] < extents[0, 1]) &
+                                   (extents[1, 0] < pts[:, 1]) & (pts[:, 1] < extents[1, 1]) &
+                                   (extents[2, 0] < pts[:, 2]) & (pts[:, 2] < extents[2, 1])
+                                   )[0]
+            pts = pts[filter_idx]
+
+
+    # Discretize voxel coordinates to given quantization size
+    discrete_pts = np.floor(pts[:, :3] / voxel_size).astype(np.int32)
+
+    # Use Lex Sort, sort by x, then y, then z
+    x_col = discrete_pts[:, 0]
+    y_col = discrete_pts[:, 1]
+    z_col = discrete_pts[:, 2]
+    sorted_order = np.lexsort((z_col, y_col, x_col))
+    discrete_pts = discrete_pts[sorted_order]
+    pts = pts[sorted_order]
+
+    # Find unique voxel coordinates
+    contiguous_array = np.ascontiguousarray(discrete_pts).view(
+        np.dtype((np.void, discrete_pts.dtype.itemsize * discrete_pts.shape[1])))
+    _, unique_indices = np.unique(contiguous_array, return_index=True)
+    unique_indices.sort()
+    voxel_coords = discrete_pts[unique_indices]
+
+    # compute the minimum and maximum voxel coordinates
+    if extents is not None:
+        min_voxel_coord = np.floor(extents.T[0] / voxel_size)
+        max_voxel_coord = np.ceil(extents.T[1] / voxel_size) - 1
+    else:
+        min_voxel_coord = np.amin(voxel_coords, axis=0)
+        max_voxel_coord = np.amax(voxel_coords, axis=0)
+
+    # get the svoxel grid dimension
+    num_divisions = ((max_voxel_coord - min_voxel_coord) + 1).astype(np.int32)
+
+    # bring the min voxel to the origin
+    voxel_indices = (voxel_coords - min_voxel_coord).astype(int)
+
+    # initialize voxel velocity and direction grid
+    velocity_voxel = np.zeros(num_divisions.astype(int), dtype=np.float32)
+    direction_voxel = np.zeros_like(velocity_voxel)
+    # initialize voxel direction with cos
+    direction_cos_voxel = np.zeros( (*num_divisions.astype(int), 3) , dtype=np.float32)
+
+    # init pixel
+    velocity_pixel = np.zeros(num_divisions[:2].astype(int), dtype=np.float32)
+    direction_pixel = np.zeros_like(velocity_pixel)
+    # init pixel direction with cos
+    direction_cos_pixel = np.zeros( (*num_divisions[:2].astype(int), 3), dtype=np.float32)
+
+    # Process each unique voxel
+    for start_idx, end_idx in zip(unique_indices, np.append(unique_indices[1:], pts.shape[0])):
+        voxel_points = pts[start_idx : end_idx]
+
+        # select top k speeds along z-axis
+        top_k_indices = np.argpartition(voxel_points[:, 4], -top_k)[-top_k:]
+        top_k_voxel_points = voxel_points[top_k_indices]
+
+        # calculate the average velocity for aggregate velocity
+        agg_voxel_velocity = np.mean(top_k_voxel_points[:, 4])
+        agg_voxel_direction = np.mean(np.arctan2(top_k_voxel_points[:, 1], top_k_voxel_points[:, 0]))
+        agg_vectors = top_k_voxel_points[:, :3]
+        norms = np.linalg.norm(agg_vectors, axis=1, keepdims=True)
+        unit_vectors = agg_vectors / norms
+        agg_voxel_cos = np.mean(unit_vectors, axis=0)
+
+
+        # calculate the average velocity
+        voxel_velocity = np.mean(voxel_points[:, 4])
+
+        # calculate the average direction(angle from LiDAR to points)
+        directions = np.arctan2(voxel_points[:, 1], voxel_points[:, 0])
+        # average directions
+        voxel_direction = np.mean(directions)
+
+        # calculate direction cosine(from lidar [0, 0, 0])
+        vectors = voxel_points[:, :3]
+        norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+        unit_vectors = vectors / norms
+        # average direction cosine
+        voxel_cos = np.mean(unit_vectors, axis=0)
+
+
+
+        voxel_index = (discrete_pts[start_idx] - min_voxel_coord).astype(int)
+        if np.all(voxel_index >= 0) and np.all(voxel_index < num_divisions):
+            # pixel result
+            velocity_pixel[voxel_index[0], voxel_index[1]] = agg_voxel_velocity
+            direction_pixel[voxel_index[0], voxel_index[1]] = agg_voxel_direction
+            direction_cos_pixel[voxel_index[0], voxel_index[1], :] = agg_voxel_cos
+
+            # voxel result
+            velocity_voxel[voxel_index[0], voxel_index[1], voxel_index[2]] = voxel_velocity
+            direction_voxel[voxel_index[0], voxel_index[1], voxel_index[2]] = voxel_direction
+
+            direction_cos_voxel[voxel_index[0], voxel_index[1], voxel_index[2], :] = voxel_cos
+
+    if return_indices:
+        return velocity_voxel, direction_voxel, direction_cos_voxel, \
+            velocity_pixel, direction_pixel, direction_cos_pixel, \
+            voxel_indices
+    else:
+        return velocity_voxel, direction_voxel, direction_cos_voxel, \
+            velocity_pixel, direction_pixel, direction_cos_pixel
 
 
 def voxelize_pillar_indices(pts, voxel_size, extents=None):
