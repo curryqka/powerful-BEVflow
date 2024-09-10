@@ -1,7 +1,7 @@
 
 from enum import IntEnum
 from typing import Tuple
-
+import os
 import numpy as np
 from pyquaternion import Quaternion
 from scipy.spatial.transform import Rotation as R
@@ -48,7 +48,20 @@ def view_points(points: np.ndarray, view: np.ndarray, normalize: bool) -> np.nda
         points = points / points[2:3, :].repeat(3, 0).reshape(3, nbr_points)
 
     return points
-    
+
+def transform_corners(corners:np.ndarray, trans_matrix):
+    # corner_rotate 是形状为 (1, 8, 3) 的输入数据
+    # 扩展到齐次坐标（添加最后一列 1）
+    ones = np.ones((corners.shape[0], corners.shape[1], 1))
+    corner_rotate_homogeneous = np.concatenate((corners, ones), axis=2)
+
+    # 转换矩阵与扩展后的数据进行矩阵乘法
+    transformed_homogeneous = np.matmul(corner_rotate_homogeneous, trans_matrix.T)
+
+    # 只取前三列作为最终结果
+    corner_rotate_transformed = transformed_homogeneous[:, :, :3]
+    return corner_rotate_transformed
+
 def transform_matrix(translation: np.ndarray = np.array([0, 0, 0]),
                      rotation: Quaternion = Quaternion([1, 0, 0, 0]),
                      inverse: bool = False) -> np.ndarray:
@@ -85,3 +98,34 @@ def yaw_to_rotation_matrix(yaw):
         [sin_yaw,  cos_yaw, 0],
         [0,        0,       1]
     ])
+
+def check_pc(pc_file_path, point_cloud_range = [0, -32, -3, 64, 32, 2]):
+    frames = os.listdir(pc_file_path)
+    frames = [os.path.join(pc_file_path, frame) for frame in frames if frame.endswith(".bin")]
+    for idx, frame in enumerate(frames):
+    # print(frames)
+    # save_data_dict
+    # 1708911118.192297
+    # 1708911112.392067
+    # if frame.split('/')[-1] == "1708911112.392067.bin":
+        
+        if idx >= 0 and idx <= 1e3:
+            points = np.fromfile(frame, dtype=np.float32).reshape(-1, 5)
+            mask = (
+                (points[:, 0] >= point_cloud_range[0])
+                & (points[:, 1] >= point_cloud_range[1])
+                & (points[:, 2] >= point_cloud_range[2])
+                & (points[:, 0] <= point_cloud_range[3])
+                & (points[:, 1] <= point_cloud_range[4])
+                & (points[:, 2] <= point_cloud_range[5])
+            )
+            # breakpoint()
+            points = points[mask]
+            if points.shape[0] < 5e4:
+                print(f"The points frame: {frame} less than 50000!")
+                return False
+                # print(points)
+            
+            # print(frame)
+            # print(idx, points.shape)
+    return True

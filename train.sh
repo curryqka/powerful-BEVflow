@@ -4,8 +4,14 @@ OMP_NUM_THREADS=1 python train_multi_seq.py --data /mnt/personal/qiankangan/at12
 --batch 32 --nepoch 100 --nworker 2  --log --logpath /home/qiankangan/logs/at128_0v1 --gpu "0" \
 --use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 2.0 
 
+
+OMP_NUM_THREADS=1 python train_multi_seq_wt128.py --data /mnt/personal/qiankangan/wt128_0/train --evaldata /mnt/personal/qiankangan/wt128_0/train \
+--batch 32 --nepoch 100 --nworker 2  --log --logpath /home/qiankangan/logs/wt128_0v1 --gpu "5" \
+--use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 2.0 
+
+
 OMP_NUM_THREADS=1 python train_multi_seq.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
---batch 8 --nepoch 45 --nworker 4  --log --logpath /home/qiankangan/MotionNet/logs/MotionNet --gpu "0" \
+--batch 16 --nepoch 45 --nworker 2  --log --logpath /home/qiankangan/logs/nuscenes --gpu "4" \
 --use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 2.0 
 
 OMP_NUM_THREADS=1 python eval.py --data /mnt/personal/qiankangan/at128_0/train \

@@ -3,8 +3,8 @@ from functools import reduce
 from abc import ABC,abstractmethod
 import sys,cv2
 sys.path.insert(0, "/home/qiankangan/MotionNet")
-from HeTools.Hedata import CustomDataset
-from HeTools.He_utils import transform_matrix, view_points
+from HeTools.Hedata import CustomDataset, CustomDatasetV2
+from HeTools.He_utils import transform_matrix, view_points, transform_corners
 from typing import List, Dict, Tuple, Any
 from pyquaternion import Quaternion
 from scipy.spatial.transform import Rotation as R
@@ -78,7 +78,7 @@ class LidarPointCloud(ABC):
         ref_timestamp = timestamps[nsweeps_back - 1]
         ref_pose_rec_path = dataset.get_pose(scene_name, ref_timestamp)
         ref_pose_rec = dataset.read_pose_data_v2(ref_pose_rec_path, return_quat=False)
-        ref_cs_rec = dataset.get_calibrated_sensor(scene_name, ref_timestamp)
+        # ref_cs_rec = dataset.get_calibrated_sensor(scene_name, ref_timestamp)
         ref_time = ref_timestamp
 
         # Homogeneous transform from ego car frame to reference frame
@@ -116,7 +116,7 @@ class LidarPointCloud(ABC):
             trans_matrix_list.append(trans_matrix)
 
             # Remove close points and add timevector
-            current_pc.remove_close(min_distance)
+            # current_pc.remove_close(min_distance)
             time_lag = float(ref_time) - float(timestamp)  # positive difference
             times = time_lag * np.ones((1, current_pc.nbr_points()))
             all_times = np.hstack((all_times, times))
@@ -166,7 +166,7 @@ class LidarPointCloud(ABC):
 
     @classmethod
     def get_instance_boxes_multisweep_sample_data(cls,
-                                                  dataset: CustomDataset,
+                                                  dataset: CustomDatasetV2,
                                                   scene_name: str,
                                                   ref_timestamp: float,
                                                   instance_token: str,
@@ -247,16 +247,15 @@ class LidarPointCloud(ABC):
                     # global_from_current = transform_matrix(current_pose_rec['translation'], current_pose_rec['rotation'], inverse=False)
                     global_from_current = current_pose_rec
 
-                    # current_cs_rec = dataset.get_calibrated_sensor(scene_name, timestamp)
-                    # car_from_current = transform_matrix(current_cs_rec['translation'], current_cs_rec['rotation'], inverse=False)
+                    """Transform box from at2wt"""
+                    if dataset.data_vision == "V2":
+                        current_at_pose_rec_path = dataset.get_at_pose(scene_name, current_timestamp)
+                        current_at_pose_rec = dataset.read_pose_data_v2(current_at_pose_rec_path, return_quat=False)
+                        current_at2global = current_at_pose_rec
+                        current_global2wt = np.linalg.inv(current_pose_rec)
 
-                    # Fuse four transformation matrices into one and perform transform
-                    # trans_matrix = np.dot(ref_from_global, global_from_current)
-
-                    # corner_rotate = np.matmul(trans_matrix[:3, :3], corner_rotate.transpose(0, 2, 1))
-                    # corner_rotate = trans_matrix[:3, 3].reshape(3,1) + corner_rotate
-
-                    # import numpy as np
+                        at2wt_matrix = np.dot(current_global2wt, current_at2global)
+                        corner_rotate = transform_corners(corner_rotate, at2wt_matrix)
 
                     # 假设 trans_matrix 是 4x4 的转换矩阵
                     trans_matrix = np.dot(ref_from_global, global_from_current)
@@ -389,7 +388,8 @@ class HeLidarPointCloud(LidarPointCloud):
         return 4
 
     @classmethod
-    def from_file(cls, file_name: str, vel_file_name=None, dataset:CustomDataset = None) -> 'HeLidarPointCloud':
+    def from_file(cls, file_name: str, vel_file_name=None, dataset:CustomDataset = None, \
+                    data_type = "V2", ) -> 'HeLidarPointCloud':
         """
         Loads LIDAR data from binary numpy format. Data is stored as (x, y, z, intensity, ring index).
         :param file_name: Path of the pointcloud file on disk.
@@ -398,12 +398,13 @@ class HeLidarPointCloud(LidarPointCloud):
 
         assert file_name.endswith('.bin'), 'Unsupported filetype {}'.format(file_name)
 
+        
         if dataset.sensor_type == "at128_0":
             scan = np.fromfile(file_name, dtype=np.float32)
             points = scan.reshape((-1, 4))[:, :cls.nbr_dims()]
             # points = scan.reshape((128, 1200, -1))[:, :, :cls.nbr_dims()]
             return cls(points.T)
-        elif dataset.sensor_type == "wt128_0":
+        elif dataset.sensor_type == "wt128_0" and data_type == "V2":
             scan = np.fromfile(file_name, dtype=np.float32)
             points = scan.reshape((-1, 4))[:, :cls.nbr_dims()]
             # points = scan.reshape((128, 1200, -1))[:, :, :cls.nbr_dims()]
@@ -413,6 +414,20 @@ class HeLidarPointCloud(LidarPointCloud):
             points = np.concatenate((points, vel), axis=1)
 
             return cls(points.T, sensor_type="wt128_0")
+       
+        elif dataset.sensor_type == "wt128_0" and data_type == "V1":
+            scan = np.fromfile(file_name, dtype=np.float32)
+            
+            # try:
+            #     points = scan.reshape((-1, 6))[:, :cls.nbr_dims() + 1]
+            # except:
+                # breakpoint()
+            assert scan.shape[0] == 320000, "miss points"
+            points = scan.reshape((-1, 5))[:, :cls.nbr_dims() + 1]
+            
+            assert points.shape[0] == 128*500, "miss points"
+            return cls(points.T, sensor_type="wt128_0")
+        
 
 class Box:
     """

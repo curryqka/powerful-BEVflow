@@ -15,7 +15,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from data.nuscenes_dataloader import TrainDatasetMultiSeq, DatasetSingleSeq
-from model import MotionNet
+from model.model import MotionNet
 
 
 class AverageMeter(object):
@@ -55,7 +55,7 @@ pred_adj_frame_distance = True  # Whether to predict the relative offset between
 height_feat_size = 13  # The size along the height dimension
 cell_category_num = 5  # The number of object categories (including the background)
 
-out_seq_len = 10  # The number of future frames we are going to predict
+out_seq_len = 20  # The number of future frames we are going to predict
 trans_matrix_idx = (
     1  # Among N transformation matrices (N=2 in our experiment), which matrix is used for alignment (see paper)
 )
@@ -74,6 +74,8 @@ parser.add_argument(
 parser.add_argument("--batch", default=8, type=int, help="Batch size")
 parser.add_argument("--nepoch", default=45, type=int, help="Number of epochs")
 parser.add_argument("--nworker", default=4, type=int, help="Number of workers")
+
+parser.add_argument("--lr", default=0.0032, type=float, help="The model learning rate")
 
 parser.add_argument(
     "--reg_weight_bg_tc", default=0.1, type=float, help="Weight of background temporal consistency term"
@@ -161,14 +163,20 @@ def main():
     device_num = torch.cuda.device_count()
     print("device number", device_num)
 
-    
+    tmp = args.data
+    sensor_type = tmp.split('/')[-2]
+    if sensor_type == "wt128_0":
+        velocity_flag = True
+    else:
+        velocity_flag = False
     trainset = TrainDatasetMultiSeq(
         dataset_root=args.data,
+        use_velocity_flag=velocity_flag,
         future_frame_skip=0,
         voxel_size=voxel_size,
         area_extents=area_extents,
         num_category=cell_category_num,
-        num_future_frames=5,
+        num_future_frames=out_seq_len,
     )
 
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=BATCH_SIZE, shuffle=True, num_workers=num_workers)
@@ -190,7 +198,7 @@ def main():
         criterion = nn.SmoothL1Loss(reduction="none")
     else:
         criterion = nn.SmoothL1Loss(reduction="sum")
-    optimizer = optim.Adam(model.parameters(), lr=0.0032)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 20, 30, 40], gamma=0.5)
 
     if args.resume != "":
@@ -222,7 +230,7 @@ def main():
         # TODO: eval function
         me_static, me_slow, me_fast, pixel_acc = \
             eval_motion_displacement(model=model, dataloader=evalloader, dataset=evalset, device=device, \
-                                    num_future_sweeps=5)
+                                    num_future_sweeps=out_seq_len)
         # me_static, me_slow, me_fast, pixel_acc = 0,0,0,0
         if need_log:
             saver.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(loss_disp, loss_class, loss_motion, loss_bg_tc,
@@ -233,7 +241,7 @@ def main():
 
         # save model
         # if need_log and (epoch % 5 == 0 or epoch == num_epochs or epoch == 1 or epoch > 45):
-        if need_log and (epoch % 10 == 0 or epoch == 1):
+        if need_log and (epoch > 5 or epoch == 1 and epoch % 5 == 0):
             save_dict = {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
@@ -268,7 +276,8 @@ def train(model, criterion, trainloader, optimizer, device, epoch):
             num_past_frames,
             num_future_frames,
         ) = data
-
+        # breakpoint()
+        # assert padded_voxel_points_list.shape == (28, 2, 5, 256, 256, 13)
         # Move to GPU/CPU
         # padded_voxel_points = padded_voxel_points.view(-1, num_past_frames[0].item(), 256, 256, height_feat_size)
         padded_voxel_points = padded_voxel_points.view(-1, num_past_frames[0].item(), h, w, height_feat_size)
@@ -334,7 +343,7 @@ def train(model, criterion, trainloader, optimizer, device, epoch):
 # eval function
 def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_path=None, use_adj_frame_pred=True,
                              future_frame_skip=0,
-                             num_future_sweeps=20, batch_size=1, use_motion_state_pred_masking=True,
+                             num_future_sweeps=10, batch_size=1, use_motion_state_pred_masking=True,
                              general_flag = False):
     """
     Evaluate the motion prediction results.
@@ -352,7 +361,7 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
     selected_future_sweeps = np.arange(0, num_future_sweeps + 1, future_frame_skip + 1)
     selected_future_sweeps = selected_future_sweeps[1:]
     last_future_sweep_id = selected_future_sweeps[-1]
-    distance_intervals = speed_intervals * (last_future_sweep_id / 20.0)  # "20" is because the LIDAR scanner is 20Hz
+    distance_intervals = speed_intervals * (last_future_sweep_id / num_future_sweeps)  # "20" is because the LIDAR scanner is 20Hz
 
     cell_groups = list()  # grouping the cells with different speeds
     for i in range(distance_intervals.shape[0]):
@@ -444,7 +453,7 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
         # Compute the static and moving cell masks, and
         # Iterate through the distance intervals and group the cells based on their speeds;
         upper_thresh = 0.2
-        upper_bound = (future_frame_skip + 1) / 20 * upper_thresh
+        upper_bound = (future_frame_skip + 1) / 10 * upper_thresh
 
         static_cell_mask = all_disp_field_gt_norm <= upper_bound
         static_cell_mask = np.all(static_cell_mask, axis=1)  # along the temporal axis
@@ -574,6 +583,10 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
     cm = confusion_matrix(overall_cls_gt, overall_cls_pred)
     cm_sum = np.sum(cm, axis=1)
 
+    cell_cls_num = len(np.unique(overall_cls_gt))
+    cell_cls_num1 = len(np.unique(overall_cls_pred))
+    # breakpoint()
+    print("cls_num: {} / {}".format(cell_cls_num, cell_cls_num1))
     # cell_cls_num = 2
     # mean_cat = cm[np.arange(cell_cls_num), np.arange(cell_cls_num)] / cm_sum
     # cat_map = {0: 'Bg', 1: 'Vehicle', 2: 'Ped', 3: 'Bike', 4: 'Others'}

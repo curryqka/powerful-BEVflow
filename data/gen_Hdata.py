@@ -4,7 +4,7 @@ import numpy as np
 import argparse
 from data_utils import voxelize_occupy, voxelize_with_velocity, gen_2d_grid_gt, gen_2d_grid_gt_He
 from dataH_utils import HeLidarPointCloud
-from HeTools.Hedata import CustomDataset
+from HeTools.Hedata import CustomDataset, CustomDatasetV2
 # def check_folder(folder_name):
 #     if not os.path.exists(folder_name):
 #         os.mkdir(folder_name)
@@ -24,6 +24,7 @@ parser.add_argument('-r', '--root', default='/media/pwu/Data/3D_data/nuscene/all
 parser.add_argument('-s', '--split', default='train', type=str, help='The data split [train/val/test]')
 parser.add_argument('-p', '--savepath', default='/media/pwu/62316788-a8e6-423c-9ed3-303ebb3ab2de/pwu/temporal_data/train', type=str, help='Directory for saving the generated data')
 parser.add_argument('-l', '--lidartype', default="at128_0", type=str, help='The lidar type')
+parser.add_argument('-v', '--datavision', default="V1", type=str, help='The data vision')
 args = parser.parse_args()
 
 # nusc = NuScenes(version='v1.0-trainval', dataroot=args.root, verbose=True)
@@ -63,13 +64,19 @@ num_past_frames_for_bev_seq = 5  # the number of past frames for BEV map sequenc
 # print("Split: {}, which contains {} scenes.".format(args.split, len(scenes)))
 if args.lidartype == "at128_0":
     # split_file_path = "HeTools/test.list"
-    # split_file_path="HeTools/total_filter_val_filter_01.list"
-    split_file_path = "/mnt/personal/ts/others/qinghua/shiyining/seqs.list"
+    split_file_path="HeTools/total_filter_val_filter_01.list"
+    # split_file_path = "/mnt/personal/ts/others/qinghua/shiyining/seqs.list"
 else:
     split_file_path = None
-hedataset = CustomDataset(root_path=args.root, sensor_type=args.lidartype, data_type=args.split, \
-                        split_file_path=split_file_path, \
-                        frame_skip=1, history_frames = nsweeps_back, future_frames = nsweeps_forward)
+if args.datavision == "V1":
+    hedataset = CustomDataset(root_path=args.root, sensor_type=args.lidartype, data_type=args.split, \
+                            split_file_path=split_file_path, \
+                            frame_skip=1, history_frames = nsweeps_back, future_frames = nsweeps_forward)
+elif args.datavision == "V2":
+    hedataset = CustomDatasetV2(root_path=args.root, sensor_type=args.lidartype, data_type=args.split, data_vision="V2", \
+                                split_file_path="/mnt/personal/ts/others/qinghua/shiyining/seqs.list", \
+                                save_sample_file_path="./data/sample", path_map_json="/mnt/personal/ts/others/qinghua/shiyining/at2wt.json", \
+                                frame_skip=1, history_frames = nsweeps_back, future_frames = nsweeps_forward)
 
 def gen_dataV2(data_split):
     res_scenes = list()
@@ -165,10 +172,6 @@ def gen_dataV2(data_split):
             num_instances = 0 # The number of instance within this sample
             corresponding_sample_token = cur_timestamp
 
-            # TODO: get_annotations_for_timestamp
-            # def get_annotations_for_timestamp(scene_name, corresponding_sample_token):
-            #     # TODO: implement this function
-            #     return []
             corresponding_sample_record = hedataset.get_annotations_for_timestamp(scene_name, corresponding_sample_token)
 
             for ann in corresponding_sample_record:
@@ -482,4 +485,9 @@ def convert_to_sparse_bev(dense_bev_data, sensor_type='at128_0'):
 
 
 if __name__ == "__main__":
-    gen_dataV2(f"./data/{args.lidartype}_{args.split}_output_file.json")
+
+    save_sample_file_path = hedataset.save_sample_file_path
+    if args.datavision == "V1":
+        gen_dataV2(f"{save_sample_file_path}/{args.lidartype}_sample/{args.lidartype}_{args.split}_output_file.json")
+    else:
+        gen_dataV2(f"{save_sample_file_path}/{args.split}_output_file.json")

@@ -8,7 +8,7 @@ from multiprocessing import Manager
 
 import numpy as np
 from torch.utils.data import Dataset
-
+import torch
 from data.data_utils import classify_speed_level
 
 
@@ -16,6 +16,7 @@ class TrainDatasetMultiSeq(Dataset):
     def __init__(
         self,
         dataset_root=None,
+        use_velocity_flag = False,
         future_frame_skip=0,
         voxel_size=(0.25, 0.25, 0.4),
         area_extents=np.array([[-32.0, 32.0], [-32.0, 32.0], [-3.0, 2.0]]),
@@ -23,6 +24,7 @@ class TrainDatasetMultiSeq(Dataset):
         num_future_frames=20,
         num_category=5,
         cache_size=10000,
+        sensor_type="at128_0",
     ):
         """
         This dataloader loads multiple sequences for a keyframe, for computing the spatio-temporal consistency losses
@@ -39,6 +41,10 @@ class TrainDatasetMultiSeq(Dataset):
         if dataset_root is None:
             raise ValueError("The dataset root is None. Should specify its value.")
 
+        # /mnt/personal/qiankangan/at128_0/train
+        # self.sensor_type = dataset_root.split('/')[-2]
+        self.sensor_type = sensor_type
+        self.use_velocity_flag = use_velocity_flag
         self.dataset_root = dataset_root
         print("data root:", dataset_root)
 
@@ -95,6 +101,9 @@ class TrainDatasetMultiSeq(Dataset):
         trans_matrices_list = list()
         pixel_instance_map_list = list()
 
+        if self.sensor_type == "wt128_0" and self.use_velocity_flag:
+            all_pixel_velocity_maps_list, all_pixel_direction_maps_list, all_pixel_cos_maps_list = list(), list(), list()
+
         for gt_dict in gt_dict_list:
             dims = gt_dict["3d_dimension"]
             num_future_pcs = gt_dict["num_future_pcs"]
@@ -120,8 +129,27 @@ class TrainDatasetMultiSeq(Dataset):
             non_empty_map = np.zeros((dims[0], dims[1]), dtype=np.float32)
             non_empty_map[pixel_indices[:, 0], pixel_indices[:, 1]] = 1.0
 
-            padded_voxel_points = list()
             num_past_pcs = self.num_past_frames
+
+            if self.sensor_type == "wt128_0" and self.use_velocity_flag:
+                sparse_pixel_velocity = gt_dict["pixel_velocity"]
+                all_pixel_velocity_maps = np.zeros((num_past_pcs, dims[0], dims[1]), dtype=np.float32)
+                all_pixel_velocity_maps[:, pixel_indices[:, 0], pixel_indices[:, 1]] = sparse_pixel_velocity
+
+                sparse_pixel_direction = gt_dict["pixel_direction"]
+                all_pixel_direction_maps = np.zeros((num_past_pcs, dims[0], dims[1]), dtype=np.float32)
+                all_pixel_direction_maps[:, pixel_indices[:, 0], pixel_indices[:, 1]] = sparse_pixel_direction
+
+                sparse_pixel_cos = gt_dict["pixel_cos"]
+                all_pixel_cos_maps = np.zeros((num_past_pcs, dims[0], dims[1], 3), dtype=np.float32)
+                all_pixel_cos_maps[:, pixel_indices[:, 0], pixel_indices[:, 1], :] = sparse_pixel_cos
+
+                all_pixel_velocity_maps_list.append(all_pixel_velocity_maps)
+                all_pixel_direction_maps_list.append(all_pixel_direction_maps)
+                all_pixel_cos_maps_list.append(all_pixel_cos_maps)
+
+
+            padded_voxel_points = list()
             for i in range(num_past_pcs):
                 indices = gt_dict["voxel_indices_" + str(i)]
                 curr_voxels = np.zeros(dims, dtype=bool)
@@ -145,6 +173,15 @@ class TrainDatasetMultiSeq(Dataset):
         trans_matrices_list = np.stack(trans_matrices_list, 0)
         pixel_instance_map_list = np.stack(pixel_instance_map_list, 0)
 
+        if self.sensor_type == "wt128_0" and self.use_velocity_flag:
+            all_pixel_velocity_maps_list = np.stack(all_pixel_velocity_maps_list, 0)
+            all_pixel_direction_maps_list = np.stack(all_pixel_direction_maps_list, 0)
+            all_pixel_cos_maps_list = np.stack(all_pixel_cos_maps_list, 0)
+
+            all_pixel_velocity_maps_list = all_pixel_velocity_maps_list[..., np.newaxis]
+            all_pixel_direction_maps_list = all_pixel_direction_maps_list[..., np.newaxis]
+            
+
         # Classify speed-level (ie, state estimation: static or moving)
         adj_seq_num = all_disp_field_gt_list.shape[0]
         motion_cat_list = list()
@@ -156,6 +193,35 @@ class TrainDatasetMultiSeq(Dataset):
             motion_cat_list.append(tmp_motion_cat)
         motion_cat_list = np.stack(motion_cat_list, axis=0)
 
+        if self.sensor_type == "wt128_0" and self.use_velocity_flag:
+            return (
+                padded_voxel_points_list,
+                all_disp_field_gt_list,
+                all_valid_pixel_maps_list,
+                non_empty_map_list,
+                pixel_cat_map_list,
+                trans_matrices_list,
+                motion_cat_list,
+                pixel_instance_map_list,
+                all_pixel_velocity_maps_list,
+                all_pixel_direction_maps_list,
+                all_pixel_cos_maps_list,
+                self.num_past_frames,
+                self.num_future_frames,
+            )
+        # breakpoint()
+        # assert padded_voxel_points_list.shape == (28, 2, 5, 256, 256, 13)
+        # print(padded_voxel_points_list.shape)
+            assert padded_voxel_points_list.shape == torch.Size([2, 5, 256, 256, 13]), "mis padded voxel points"
+            if all_disp_field_gt_list.shape != torch.Size([2, 10, 256, 256, 2]):
+                print(all_disp_field_gt_list.shape)
+            assert all_disp_field_gt_list.shape == torch.Size([2, 10, 256, 256, 2]), "mis disp gt"
+            assert all_valid_pixel_maps_list.shape == torch.Size([2, 10, 256, 256]), "mis disp valid"
+            assert non_empty_map_list.shape == torch.Size([2, 256, 256]), "mis disp nonempty"
+            assert pixel_cat_map_list.shape == torch.Size([2, 256, 256, 5]), "mis pixel cat"
+            assert trans_matrices_list.shape == torch.Size([2, 20, 4, 4]), "mis trans mat"
+            assert motion_cat_list.shape == torch.Size([2, 256, 256, 2]), "mis motion tgt"
+            assert pixel_instance_map_list.shape == torch.Size([2, 256, 256]), "mis pixel id"
         return (
             padded_voxel_points_list,
             all_disp_field_gt_list,
@@ -174,6 +240,7 @@ class DatasetSingleSeq(Dataset):
     def __init__(
         self,
         dataset_root=None,
+        use_velocity_flag=False,
         split="train",
         future_frame_skip=0,
         num_past_frames=5,
@@ -182,6 +249,7 @@ class DatasetSingleSeq(Dataset):
         area_extents=np.array([[-32.0, 32.0], [-32.0, 32.0], [-3.0, 2.0]]),
         num_category=5,
         cache_size=8000,
+        sensor_type='at128_0',
     ):
         """
         This dataloader loads single sequence for a keyframe, and is not designed for computing the
@@ -200,6 +268,11 @@ class DatasetSingleSeq(Dataset):
 
         self.dataset_root = dataset_root
         print("data root:", dataset_root)
+        
+        # /mnt/personal/qiankangan/at128_0/val
+        # self.sensor_type = dataset_root.split('/')[-2]
+        self.sensor_type = sensor_type
+        self.use_velocity_flag = use_velocity_flag
 
         # seq_dirs = [
         #     os.path.join(self.dataset_root, d)
@@ -218,7 +291,7 @@ class DatasetSingleSeq(Dataset):
             for d in os.listdir(self.dataset_root):
                 tmp_0 = os.path.join(self.dataset_root, d) + '/0.npy'
                 seq_dirs.append(tmp_0)
-        self.seq_files = seq_dirs[::10]
+        self.seq_files = seq_dirs
         self.num_sample_seqs = len(self.seq_files)
         print("The number of {} sequences: {}".format(split, self.num_sample_seqs))
 
@@ -276,6 +349,22 @@ class DatasetSingleSeq(Dataset):
         non_empty_map = np.zeros((dims[0], dims[1]), dtype=np.float32)
         non_empty_map[pixel_indices[:, 0], pixel_indices[:, 1]] = 1.0
 
+        if self.sensor_type == "wt128_0" and self.use_velocity_flag:
+            sparse_pixel_velocity = gt_dict["pixel_velocity"]
+            all_pixel_velocity_maps = np.zeros((num_past_pcs, dims[0], dims[1]), dtype=np.float32)
+            all_pixel_velocity_maps[:, pixel_indices[:, 0], pixel_indices[:, 1]] = sparse_pixel_velocity
+
+            sparse_pixel_direction = gt_dict["pixel_direction"]
+            all_pixel_direction_maps = np.zeros((num_past_pcs, dims[0], dims[1]), dtype=np.float32)
+            all_pixel_direction_maps[:, pixel_indices[:, 0], pixel_indices[:, 1]] = sparse_pixel_direction
+
+            sparse_pixel_cos = gt_dict["pixel_cos"]
+            all_pixel_cos_maps = np.zeros((num_past_pcs, dims[0], dims[1], 3), dtype=np.float32)
+            all_pixel_cos_maps[:, pixel_indices[:, 0], pixel_indices[:, 1], :] = sparse_pixel_cos
+
+            all_pixel_velocity_maps = all_pixel_velocity_maps[..., np.newaxis]
+            all_pixel_direction_maps = all_pixel_direction_maps[..., np.newaxis]
+
         padded_voxel_points = list()
         for i in range(num_past_pcs):
             indices = gt_dict["voxel_indices_" + str(i)]
@@ -288,6 +377,23 @@ class DatasetSingleSeq(Dataset):
         motion_state_gt = classify_speed_level(
             all_disp_field_gt, total_future_sweeps=20, future_frame_skip=self.future_frame_skip
         )
+
+        
+
+        if self.sensor_type == "wt128_0" and self.use_velocity_flag:
+            return (
+                padded_voxel_points,
+                all_disp_field_gt,
+                all_valid_pixel_maps,
+                non_empty_map,
+                pixel_cat_map,
+                num_past_pcs,
+                num_future_pcs,
+                motion_state_gt,
+                all_pixel_velocity_maps,
+                all_pixel_direction_maps,
+                all_pixel_cos_maps,
+            )
 
         return (
             padded_voxel_points,

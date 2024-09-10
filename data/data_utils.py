@@ -743,6 +743,7 @@ def gen_2d_grid_gt_He(data_dict: dict, grid_size: np.array, extents: np.array = 
     # -- Discretize pixel coordinates to given quantization size
     discrete_pts = np.floor(refer_pc[:, 0:2] / grid_size).astype(np.int32)
 
+    
     # -- Use Lex Sort, sort by x, then y
     x_col = discrete_pts[:, 0]
     y_col = discrete_pts[:, 1]
@@ -761,7 +762,10 @@ def gen_2d_grid_gt_He(data_dict: dict, grid_size: np.array, extents: np.array = 
     # -- Sort unique indices to preserve order
     unique_indices.sort()
     pixel_coords = discrete_pts[unique_indices]
-
+    
+    if unique_indices.shape[0] == 0:
+        breakpoint()
+    assert unique_indices.shape[0] != 0
     # -- Number of points per voxel, last voxel calculated separately
     num_points_in_pixel = np.diff(unique_indices)
     num_points_in_pixel = np.append(num_points_in_pixel, discrete_pts.shape[0] - unique_indices[-1])
@@ -1103,11 +1107,11 @@ def voxelize_with_velocity(pts, voxel_size, extents=None, return_indices=False, 
     if extents is not None:
         if extents.shape!= (3, 2):
             raise ValueError("Extents are the wrong shape {}".format(extents.shape))
-            filter_idx = np.where( (extents[0, 0] < pts[:, 0]) & (pts[:, 0] < extents[0, 1]) &
-                                   (extents[1, 0] < pts[:, 1]) & (pts[:, 1] < extents[1, 1]) &
-                                   (extents[2, 0] < pts[:, 2]) & (pts[:, 2] < extents[2, 1])
-                                   )[0]
-            pts = pts[filter_idx]
+        filter_idx = np.where( (extents[0, 0] < pts[:, 0]) & (pts[:, 0] < extents[0, 1]) &
+                                (extents[1, 0] < pts[:, 1]) & (pts[:, 1] < extents[1, 1]) &
+                                (extents[2, 0] < pts[:, 2]) & (pts[:, 2] < extents[2, 1])
+                                )[0]
+        pts = pts[filter_idx]
 
 
     # Discretize voxel coordinates to given quantization size
