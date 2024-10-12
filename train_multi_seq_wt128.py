@@ -16,6 +16,7 @@ import torch.optim as optim
 
 from data.nuscenes_dataloader import TrainDatasetMultiSeq, DatasetSingleSeq
 from model.model import MotionNet, GeneralMotionNet
+# from model.be_sti import MotionNet, GeneralMotionNet
 
 
 class AverageMeter(object):
@@ -248,7 +249,7 @@ def main():
 
         # save model
         # if need_log and (epoch % 5 == 0 or epoch == num_epochs or epoch == 1 or epoch > 45):
-        if need_log and (epoch % 10 == 0 or epoch == 1):
+        if need_log and (epoch % 20 == 0 or epoch == 1):
             save_dict = {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
@@ -299,7 +300,7 @@ def train(model, criterion, trainloader, optimizer, device, epoch):
 
         # Make prediction
         if args.use_v:
-            disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps, None)
+            disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps)
         else:
             disp_pred, class_pred, motion_pred = model(padded_voxel_points) 
 
@@ -422,7 +423,7 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
 
         with torch.no_grad():
             if args.use_v:
-                disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps, None)
+                disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps)
             else:
                 disp_pred, class_pred, motion_pred = model(padded_voxel_points)
             
@@ -1000,4 +1001,5 @@ def instance_spatial_temporal_consistency_loss(disp_pred, pixel_instance_map):
 
 
 if __name__ == "__main__":
+    # breakpoint()
     main()

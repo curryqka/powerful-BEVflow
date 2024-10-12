@@ -1,5 +1,0 @@
-GPU number: 1
-command line: /home/qiankangan/MotionNet/train_multi_seq.py --data /mnt/personal/qiankangan/at128_0/train --evaldata /mnt/personal/qiankangan/at128_0/val --batch 28 --nepoch 2 --nworker 2 --use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 15.0 --log --gpu 7
-Namespace(data='/mnt/personal/qiankangan/at128_0/train', evaldata='/mnt/personal/qiankangan/at128_0/val', resume='', batch=28, nepoch=2, nworker=2, reg_weight_bg_tc=0.1, reg_weight_fg_tc=2.5, reg_weight_sc=15.0, use_bg_tc=True, use_fg_tc=True, use_sc=True, nn_sampling=False, log=True, logpath='', gpu='7')
-
-epoch: 1, lr: 0.0032	

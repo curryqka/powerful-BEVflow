@@ -53,7 +53,7 @@ else:
 voxel_size = (0.25, 0.25, 0.4)
 # area_extents = np.array([[-32., 32.], [-32., 32.], [-3., 2.]])
 area_extents = np.array([[0., 64.], [-32., 32.], [-2., 3.]])
-past_frame_skip = 3  # when generating the BEV maps, how many history frames need to be skipped
+past_frame_skip = 1  # when generating the BEV maps, how many history frames need to be skipped
 future_frame_skip = 0  # when generating the BEV maps, how many future frames need to be skipped
 num_past_frames_for_bev_seq = 5  # the number of past frames for BEV map sequence
 
@@ -71,11 +71,14 @@ else:
 if args.datavision == "V1":
     hedataset = CustomDataset(root_path=args.root, sensor_type=args.lidartype, data_type=args.split, \
                             split_file_path=split_file_path, \
+                            save_split_file_path = "/mnt/personal/qiankangan/hadata", save_sample_file_path = '/mnt/personal/qiankangan/hadata', \
                             frame_skip=1, history_frames = nsweeps_back, future_frames = nsweeps_forward)
 elif args.datavision == "V2":
+    # path_map_json="/mnt/personal/qiankangan/sample_folder/at2wt.json"
+    path_map_json="/mnt/personal/qiankangan/sample_folder/new_at2wt.json"
     hedataset = CustomDatasetV2(root_path=args.root, sensor_type=args.lidartype, data_type=args.split, data_vision="V2", \
                                 split_file_path="/mnt/personal/ts/others/qinghua/shiyining/seqs.list", \
-                                save_sample_file_path="./data/sample", path_map_json="/mnt/personal/ts/others/qinghua/shiyining/at2wt.json", \
+                                save_sample_file_path="./data/sample", path_map_json=path_map_json, \
                                 frame_skip=1, history_frames = nsweeps_back, future_frames = nsweeps_forward)
 
 def gen_dataV2(data_split):

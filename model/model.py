@@ -4,12 +4,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from typing import List
+from model.attention import SElayer
 
 class CellClassification(nn.Module):
-    def __init__(self, category_num=5):
+    def __init__(self, category_num=5, in_channel=32):
         super(CellClassification, self).__init__()
-        self.conv1 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(in_channel, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, category_num, kernel_size=1, stride=1, padding=0)
 
         self.bn1 = nn.BatchNorm2d(32)
@@ -22,9 +23,9 @@ class CellClassification(nn.Module):
 
 
 class StateEstimation(nn.Module):
-    def __init__(self, motion_category_num=2):
+    def __init__(self, motion_category_num=2, in_channel=32):
         super(StateEstimation, self).__init__()
-        self.conv1 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(in_channel, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, motion_category_num, kernel_size=1, stride=1, padding=0)
 
         self.bn1 = nn.BatchNorm2d(32)
@@ -37,9 +38,9 @@ class StateEstimation(nn.Module):
 
 
 class MotionPrediction(nn.Module):
-    def __init__(self, seq_len):
+    def __init__(self, seq_len, in_channel=32):
         super(MotionPrediction, self).__init__()
-        self.conv1 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(in_channel, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, 2 * seq_len, kernel_size=1, stride=1, padding=0)
 
         self.bn1 = nn.BatchNorm2d(32)
@@ -64,6 +65,57 @@ class Conv3D(nn.Module):
         x = x.permute(0, 2, 1, 3, 4).contiguous()  # (batch, seq_len, c, h, w)
 
         return x
+
+class VelocityEncoder(nn.Module):
+    def __init__(self, velocity_feat_size = 1, with_direction=False, with_cos=False):
+        super(VelocityEncoder, self).__init__()
+        self.input_dim = velocity_feat_size
+        if with_direction:
+            self.input_dim += 1
+        elif with_cos:
+            self.input_dim+= 3
+        self.conv3d_1 = Conv3D(self.input_dim, 16, kernel_size=(3, 1 ,1), stride=1, padding=(0, 0, 0))
+        self.conv3d_2 = Conv3D(16, 32, kernel_size=(3, 1, 1), stride=1, padding=(0, 0, 0))
+    
+    def forward(self, x):
+        batch, seq, h, w, dim = x.size()
+        x = x.view(-1, seq, dim, h, w)
+        x = self.conv3d_1(x)
+        x = self.conv3d_2(x)
+        x = x.view(-1, x.size(2), x.size(3), x.size(4)).contiguous()
+
+        return x
+
+class VelocityEncoderV2(nn.Module):
+    def __init__(self, velocity_feat_size = 1, with_direction=False, with_cos=False):
+        super(VelocityEncoderV2, self).__init__()
+        self.input_dim = velocity_feat_size
+        if with_direction:
+            self.input_dim += 1
+        elif with_cos:
+            self.input_dim+= 3
+
+        self.backbone = STPN(self.input_dim)
+
+    def forward(self, bevs):
+        bevs = bevs.permute(0, 1, 4, 2, 3)  # (Batch, seq, z, h, w)
+        x = self.backbone(bevs)
+
+        return x
+
+
+class ConvFuser(nn.Sequential):
+    def __init__(self, in_channels: int, out_channels: int) -> None:
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        super().__init__(
+            nn.Conv2d(sum(in_channels), out_channels, 3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(True),
+        )
+
+    def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
+        return super().forward(torch.cat(inputs, dim=1))
 
 
 class STPN(nn.Module):
@@ -255,6 +307,59 @@ class GeneralMotionNet(nn.Module):
 
         return disp, cell_class_pred, state_class_pred
 
+class MixGeneralMotionNet(nn.Module):
+
+    def __init__(self, out_seq_len=20, motion_category_num=2, height_feat_size=13, \
+                with_direction=False, with_cos=False):
+        super(MixGeneralMotionNet, self).__init__()
+        self.out_seq_len = out_seq_len
+
+        self.cell_classify = CellClassification()
+        self.motion_pred = MotionPrediction(seq_len=self.out_seq_len)
+        self.state_classify = StateEstimation(motion_category_num=motion_category_num)
+        self.stpn = STPN(height_feat_size=height_feat_size)
+    
+        # self.vencoder = VelocityEncoder(velocity_feat_size=1, with_direction=with_direction, with_cos = with_cos)
+        self.vencoder = VelocityEncoderV2(velocity_feat_size=1, with_direction=with_direction, with_cos=with_cos)
+        self.ConvFuser = ConvFuser(in_channels=[32,32], out_channels=32)
+
+        # SElayer
+        self.se = SElayer(32)
+    def forward(self, bevs, prior_velocity, prior_direction=None):
+        
+        bevs = bevs.permute(0, 1, 4, 2, 3)  # (Batch, seq, z, h, w)
+
+        # if prior_velocity is not None:
+        #     prior_velocity = prior_velocity.permute(0, 1, 4, 2, 3)
+        #     bevs = torch.cat([bevs, prior_velocity], dim=2)
+        if prior_direction is not None:
+            # prior_direction = prior_direction.permute(0, 1, 4, 2, 3)
+            prior_velocity = torch.cat([prior_velocity, prior_direction], dim=-1)
+        # Backbone network
+        bev_feat = self.stpn(bevs)
+        v_feat = self.vencoder(prior_velocity)
+
+        # Fuse
+        # fuse_feat = torch.cat([bev_feat, v_feat],dim=1)
+        fuse_feat = [bev_feat, v_feat]
+        fuse_feat = self.ConvFuser(fuse_feat)
+        # x = bev_feat + fuse_feat
+        x = self.se(fuse_feat)
+        # x = fuse_feat
+
+
+        # Cell Classification head
+        cell_class_pred = self.cell_classify(x)
+
+        # Motion State Classification head
+        state_class_pred = self.state_classify(x)
+
+        # Motion Displacement prediction
+        disp = self.motion_pred(x)
+        disp = disp.view(-1, 2, x.size(-2), x.size(-1))
+
+        return disp, cell_class_pred, state_class_pred
+        
 # For MGDA loss computation
 class FeatEncoder(nn.Module):
     def __init__(self, height_feat_size=13):
@@ -289,3 +394,9 @@ class MotionNetMGDA(nn.Module):
         disp = disp.view(-1, 2, stpn_out.size(-2), stpn_out.size(-1))
 
         return disp, cell_class_pred, state_class_pred
+
+
+if __name__ == "__main__":
+    vecoder = VelocityEncoder(velocity_feat_size=1, with_direction=False, with_cos=False)
+    v = torch.rand((16, 5, 256, 256, 1))
+    print(vecoder(x=v).shape)

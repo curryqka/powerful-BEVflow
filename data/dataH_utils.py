@@ -389,7 +389,7 @@ class HeLidarPointCloud(LidarPointCloud):
 
     @classmethod
     def from_file(cls, file_name: str, vel_file_name=None, dataset:CustomDataset = None, \
-                    data_type = "V2", ) -> 'HeLidarPointCloud':
+                    data_type = "V1", ) -> 'HeLidarPointCloud':
         """
         Loads LIDAR data from binary numpy format. Data is stored as (x, y, z, intensity, ring index).
         :param file_name: Path of the pointcloud file on disk.
@@ -510,6 +510,7 @@ class Box:
 
         return: 3x3 rotation matrix
         """
+        # breakpoint()
         cos_yaw = np.cos(self.orientation)[0]
         sin_yaw = np.sin(self.orientation)[0]
 

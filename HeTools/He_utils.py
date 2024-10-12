@@ -5,6 +5,9 @@ import os
 import numpy as np
 from pyquaternion import Quaternion
 from scipy.spatial.transform import Rotation as R
+import matplotlib
+import matplotlib.pyplot as plt
+
 def rotation_matrix_to_quat(matrix):
     rotation = R.from_matrix(matrix=matrix).as_quat()
     
@@ -99,7 +102,8 @@ def yaw_to_rotation_matrix(yaw):
         [0,        0,       1]
     ])
 
-def check_pc(pc_file_path, point_cloud_range = [0, -32, -3, 64, 32, 2]):
+def check_pc(pc_file_path, point_cloud_range = [0, -32, -3, 64, 32, 2], show=False, \
+            img_save_dir="/home/qiankangan"):
     frames = os.listdir(pc_file_path)
     frames = [os.path.join(pc_file_path, frame) for frame in frames if frame.endswith(".bin")]
     for idx, frame in enumerate(frames):
@@ -110,7 +114,41 @@ def check_pc(pc_file_path, point_cloud_range = [0, -32, -3, 64, 32, 2]):
     # if frame.split('/')[-1] == "1708911112.392067.bin":
         
         if idx >= 0 and idx <= 1e3:
-            points = np.fromfile(frame, dtype=np.float32).reshape(-1, 5)
+            # breakpoint()
+            scan = np.fromfile(frame, dtype=np.float32)
+
+            
+            
+            # print("scene:{},shape:{}".format(pc_file_path, scan.shape))
+            if show:
+                if scan.shape[0]==64000*6:
+                    points = scan.reshape(-1, 6).T
+                else:
+                    points = scan.reshape(-1, 5).T
+                fig, ax = plt.subplots(1, 1, figsize=(20, 8))
+                x_lim = [0, 64]
+                y_lim = [-32, 32]   
+                v_mask = np.abs(points[-2, :]) < 1
+                v_mask_ = np.abs(points[-2, :]) >= 1
+
+                # breakpoint()
+
+                # ax[2].scatter(points[0, :], points[1, :], c=points[-1, :], s=1)
+                ax.scatter(points[0, v_mask], points[1, v_mask], c='blue', s=1)
+                ax.scatter(points[0, v_mask_], points[1, v_mask_], c='red', s=1)
+                ax.set_xlim(x_lim[0], x_lim[1])
+                ax.set_ylim(y_lim[0], y_lim[1])
+                ax.axis("off")
+                ax.set_aspect("equal")
+                # TODO: quiver
+                # U = 
+                # qk = ax[1].quiver(idx_x, idx_y, U, V, angles="xy", scale_units="xy", scale=1, color=color_map[k])
+                # ax[1].quiverkey(qk[k], X=0.0 + k / 5.0, Y=1.1, U=20, label=cat_names[k], labelpos="E")
+                ax.title.set_text("LIDAR data with v")
+                plt.savefig(os.path.join(img_save_dir, "frame.png"))
+                ax.clear()
+            assert scan.shape[0]==128*500*5
+            points = scan.reshape(-1,5)
             mask = (
                 (points[:, 0] >= point_cloud_range[0])
                 & (points[:, 1] >= point_cloud_range[1])
@@ -121,8 +159,9 @@ def check_pc(pc_file_path, point_cloud_range = [0, -32, -3, 64, 32, 2]):
             )
             # breakpoint()
             points = points[mask]
-            if points.shape[0] < 5e4:
-                print(f"The points frame: {frame} less than 50000!")
+            if points.shape[0] < 4e4 and np.where(points[:, 0]!=0)[0].shape[0] < points.shape[0]/2:
+                # breakpoint()
+                print(f"The points frame: {frame} less than 40000!")
                 return False
                 # print(points)
             

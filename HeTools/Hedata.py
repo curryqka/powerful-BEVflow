@@ -5,14 +5,13 @@ from .He_utils import rotation_matrix_to_quat, check_pc
 
 class CustomDataset:
 
-    def __init__(self, root_path:str, sensor_type:str = 'at128_0', data_type:str = "train", 
+    def __init__(self, root_path:str, sensor_type:str = 'at128_0', data_type:str = "train", data_vision = 'V1',
                 split_file_path:str = None, \
                 save_split_file_path: str = "./data", save_sample_file_path = './data', path_map_json=None,\
                     frame_skip: int = 1, history_frames: int = 5, future_frames: int = 5):
         self.root_path = root_path
         self.sensor_type = sensor_type
-        # with open(pkl_file_path, 'rb') as f:
-        #     self.data = pickle.load(f)
+        self.data_vision = data_vision
         self.data_type = data_type
         self.raw_data_path = f"{self.root_path}/raw_data/{sensor_type}"
        
@@ -113,7 +112,7 @@ class CustomDataset:
         if split_file_path is None:
             # pkl_file_path = f"{self.root_path}/groundtruth/{self.sensor_type}/Det_data_infos"
             # /mnt/yrfs/Team/Semantic/datasets/AllData/HaData/raw_data/wt128_0/sensor_data_absv
-            pkl_file_path = f"{self.root_path}/raw_data/{self.sensor_type}/sensor_data_absv"
+            pkl_file_path = f"{self.root_path}/raw_data/{self.sensor_type}/sensor_data_absv2"
 
             split_file_path = self._create_split_file(pkl_file_path)
 
@@ -162,11 +161,14 @@ class CustomDataset:
         save_split_file_path = f"{self.save_split_file_path}/trainval.list"
         # breakpoint()
         pkl_file_list = [scene.split('.')[0] for scene in os.listdir(os.path.join(self.root_path, 'groundtruth', self.sensor_type, 'Det_data_infos'))]
+        print("The pkl file contains {} scenes".format(len(pkl_file_list)))
         with open(save_split_file_path, 'w') as f:
             for scene_name in os.listdir(pkl_file_path):
                 if scene_name in pkl_file_list:
-
-                    pc_path = os.path.join(self.root_path, 'raw_data', self.sensor_type, 'sensor_data_absv', scene_name)
+                    
+                    # raw type: has upgrated!! 20240919
+                    pc_path = os.path.join(self.root_path, 'raw_data', self.sensor_type, 'sensor_data_absv2', scene_name)
+                    # pc_path = os.path.join(self.root_path, 'raw_data', self.sensor_type, 'abs_velocity', scene_name)
                     valid_pc_flag = check_pc(pc_path)
                     if valid_pc_flag:
                         f.write(scene_name.split('.')[0] + '\n')
@@ -174,7 +176,7 @@ class CustomDataset:
         print("Split file created successfully.")
         return save_split_file_path
 
-    def _split_split_file(self, split_file_path: str, train_ratio=10, val_ratio=3, test_ratio=4) -> None:
+    def _split_split_file(self, split_file_path: str, train_ratio=8, val_ratio=1.5, test_ratio=0.5) -> None:
         with open(split_file_path, 'r') as file:
             lines = file.readlines()
 
@@ -184,11 +186,12 @@ class CustomDataset:
         total_ratio = train_ratio + val_ratio + test_ratio
         train_size = (train_ratio/ total_ratio) * len(lines)
         val_size = (val_ratio / total_ratio) * len(lines)
-
+        
         train_set = lines[:int(train_size)]
         val_set = lines[int(train_size):int(train_size + val_size)]
         test_set = lines[int(train_size + val_size):]
 
+        print("The train set: {}, val set: {}, test set: {}".format(len(train_set), len(val_set), len(test_set)))
         set_list = {'train': train_set, 'val': val_set, 'test': test_set}
         
         file_list = []
@@ -294,7 +297,8 @@ class CustomDataset:
         for entry in self.data:
             if entry['point_cloud']['sequence_id'] == scene_name and entry['point_cloud']['lidar_idx'] == str(timestamp):
 
-                lidar_path = f"{self.root_path}/raw_data/{self.sensor_type}/sensor_data/{scene_name}/{timestamp}.bin"
+                # /mnt/yrfs/Team/Semantic/datasets/AllData/AllData/HaData/raw_data/wt128_0/sensor_data_absv
+                lidar_path = f"{self.root_path}/raw_data/{self.sensor_type}/sensor_data_absv2/{scene_name}/{timestamp}.bin"
                 return lidar_path
         print(f"No pointcloud data for {scene_name} at {timestamp}")
         return None
@@ -304,10 +308,10 @@ class CustomDataset:
         for entry in self.data:
             if entry['point_cloud']['sequence_id'] == scene_name and entry['point_cloud']['lidar_idx'] == str(timestamp):
 
-                velocity_path = f"{self.root_path}/raw_data/{self.sensor_type}/velocity/{scene_name}/{timestamp}.bin"
+                velocity_path = f"{self.root_path}/raw_data/{self.sensor_type}/abs_velocity/{scene_name}/{timestamp}.bin"
 
-                if not os.path.exists(velocity_path):
-                    velocity_path = f"{self.root_path}/raw_data/{self.sensor_type}/rel_velocity/{scene_name}/{timestamp}.bin"
+                # if not os.path.exists(velocity_path):
+                #     velocity_path = f"{self.root_path}/raw_data/{self.sensor_type}/rel_velocity/{scene_name}/{timestamp}.bin"
                 return velocity_path
         print(f"No pointcloud velocity data for {scene_name} at {timestamp}")
         return None
@@ -613,7 +617,7 @@ class CustomDatasetV2:
             for scene_name in os.listdir(pkl_file_path):
                 if scene_name in pkl_file_list:
 
-                    pc_path = os.path.join(self.root_path, 'raw_data', self.sensor_type, 'sensor_data_absv', scene_name)
+                    pc_path = os.path.join(self.root_path, 'raw_data', self.sensor_type, 'sensor_data_absv2', scene_name)
                     valid_pc_flag = check_pc(pc_path)
                     if valid_pc_flag:
                         f.write(scene_name.split('.')[0] + '\n')
@@ -621,7 +625,7 @@ class CustomDatasetV2:
         print("Split file created successfully.")
         return save_split_file_path
 
-    def _split_split_file(self, split_file_path: str, train_ratio=10, val_ratio=3, test_ratio=4) -> None:
+    def _split_split_file(self, split_file_path: str, train_ratio=8, val_ratio=1.5, test_ratio=0.5) -> None:
         with open(split_file_path, 'r') as file:
             lines = file.readlines()
 
@@ -775,7 +779,7 @@ class CustomDatasetV2:
                     velocity_path = f"{self.root_path}/raw_data/wt128_0/abs_velocity/{wt_sequence_id}/{wt_lidar_idx}.bin"
 
                     if not os.path.exists(velocity_path):
-                        print("The abs velocity not exists!")
+                        print("The abs velocity in {} | {} not exists!".format(scene_name, timestamp))
                         velocity_path = f"{self.root_path}/raw_data/wt128_0/rel_velocity/{wt_sequence_id}/{wt_lidar_idx}.bin"
                 
                     

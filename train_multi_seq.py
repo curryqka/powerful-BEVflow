@@ -16,6 +16,7 @@ import torch.optim as optim
 
 from data.nuscenes_dataloader import TrainDatasetMultiSeq, DatasetSingleSeq
 from model.model import MotionNet
+# from model.be_sti import MotionNet
 
 
 class AverageMeter(object):
@@ -55,7 +56,7 @@ pred_adj_frame_distance = True  # Whether to predict the relative offset between
 height_feat_size = 13  # The size along the height dimension
 cell_category_num = 5  # The number of object categories (including the background)
 
-out_seq_len = 20  # The number of future frames we are going to predict
+out_seq_len = 10  # The number of future frames we are going to predict
 trans_matrix_idx = (
     1  # Among N transformation matrices (N=2 in our experiment), which matrix is used for alignment (see paper)
 )
@@ -241,7 +242,7 @@ def main():
 
         # save model
         # if need_log and (epoch % 5 == 0 or epoch == num_epochs or epoch == 1 or epoch > 45):
-        if need_log and (epoch > 5 or epoch == 1 and epoch % 5 == 0):
+        if need_log and (epoch > 5) and (epoch % 5 == 0):
             save_dict = {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),

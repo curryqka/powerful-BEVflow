@@ -65,6 +65,7 @@ def vis_scene_data(
         raise ValueError("Should specify the nuScenes data path.")
 
     sample_json_files="./data/sample/train_output_file.json"
+    # sample_json_files = "./data/wt128_0_sample/wt128_0_train_output_file.json"
     with open(sample_json_files, 'r') as f:
         lines = f.read()
         parsed_data = json.loads(lines)
@@ -634,7 +635,7 @@ def vis_model_per_sample_data(
         raise ValueError("Need to specify image save path.")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    fig, ax = plt.subplots(1, 2, figsize=(20, 8))
+    fig, ax = plt.subplots(1, 3, figsize=(20, 8))
 
     # Load pre-trained network weights
     if which_model == "MotionNet":
@@ -797,8 +798,22 @@ def vis_model_per_sample_data(
         ax[1].set_aspect("equal")
         ax[1].title.set_text("Ground-truth")
         ax[1].axis("off")
+    # breakpoint()
+    v_mask = np.abs(points[-1, :]) < 1.0
+    v_mask_ = np.abs(points[-1, :]) >= 1.0
 
-
+    # ax[2].scatter(points[0, :], points[1, :], c=points[-1, :], s=1)
+    ax[2].scatter(points[0, v_mask], points[1, v_mask], c='blue', s=1)
+    ax[2].scatter(points[0, v_mask_], points[1, v_mask_], c='red', s=1)
+    ax[2].set_xlim(x_lim[0], x_lim[1])
+    ax[2].set_ylim(y_lim[0], y_lim[1])
+    ax[2].axis("off")
+    ax[2].set_aspect("equal")
+    # TODO: quiver
+    # U = 
+    # qk = ax[1].quiver(idx_x, idx_y, U, V, angles="xy", scale_units="xy", scale=1, color=color_map[k])
+    # ax[1].quiverkey(qk[k], X=0.0 + k / 5.0, Y=1.1, U=20, label=cat_names[k], labelpos="E")
+    ax[2].title.set_text("LIDAR data with v")
     print("finish sample {}".format(frame_idx))
     plt.savefig(os.path.join(img_save_dir, str(frame_idx) + ".png"))
 
@@ -806,6 +821,7 @@ def vis_model_per_sample_data(
         plt.pause(0.02)
     ax[0].clear()
     ax[1].clear()
+    ax[2].clear()
 
     if disp:
         plt.show()
@@ -868,7 +884,8 @@ if __name__ == "__main__":
             matplotlib.use("AGG")
 
         # index_file_path="/mnt/personal/ts/others/qinghua/shiyining/seqs.list"
-        index_file_path = "/home/qiankangan/MotionNet/data/splitfile/train.list"
+        # index_file_path = "/home/qiankangan/MotionNet/data/wt128_0_splitfile/wt128_0_train.list"
+        index_file_path="/home/qiankangan/MotionNet/data/splitfile/train.list"
         with open(index_file_path, 'r') as f:
             scene_list = [line.strip() for line in f.readlines()]
         print(f"The processing scene is {scene_list[args.scene]}")

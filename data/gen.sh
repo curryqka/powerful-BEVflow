@@ -7,6 +7,9 @@ lidar_type=$2
 vision=$3
 echo "save path is : /mnt/personal/qiankangan/$lidar_type/$data_type"
 # motionnet
-OMP_NUM_THREADS=1 python data/gen_Hdata.py  --root /mnt/yrfs/Team/Semantic/datasets/AllData/HaData2 \
---split $data_type --lidartype $lidar_type --savepath /mnt/personal/qiankangan/V2_$lidar_type/$data_type \
+# OMP_NUM_THREADS=1 python data/gen_Hdata.py  --root /mnt/yrfs/Team/Semantic/datasets/AllData/HaData \
+# --split $data_type --lidartype $lidar_type --savepath /mnt/personal/qiankangan/V0new_$lidar_type/$data_type \
+# --datavision $vision
+OMP_NUM_THREADS=1 python data/gen_Hdata.py  --root /mnt/personal/qiankangan/hadata \
+--split $data_type --lidartype $lidar_type --savepath /mnt/personal/qiankangan/all_$lidar_type/$data_type \
 --datavision $vision

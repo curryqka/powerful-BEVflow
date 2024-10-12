@@ -11,7 +11,7 @@ OMP_NUM_THREADS=1 python train_multi_seq_wt128.py --data /mnt/personal/qiankanga
 
 
 OMP_NUM_THREADS=1 python train_multi_seq.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
---batch 16 --nepoch 45 --nworker 2  --log --logpath /home/qiankangan/logs/nuscenes --gpu "4" \
+--batch 32 --nepoch 45 --nworker 2  --log --logpath /home/qiankangan/logs/nuscenes --gpu "3" \
 --use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 2.0 
 
 OMP_NUM_THREADS=1 python eval.py --data /mnt/personal/qiankangan/at128_0/train \
