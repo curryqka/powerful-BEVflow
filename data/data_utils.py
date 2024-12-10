@@ -6,12 +6,14 @@ import os
 from nuscenes.utils.data_classes import Box
 import sys
 sys.path.insert(0, '/home/hesai/qiankangan/MotionNet')
+sys.path.insert(0, '/home/qiankangan/MotionNet')
 from data.dataH_utils import Box as HeBox
 from pyquaternion import Quaternion
 from numba import njit
 import random
 import pickle,json
 from scipy.spatial.transform import Rotation as R
+from utlis.view_utlis import plot_true_vs_measured, plot_error_distribution, plot_instance_counts_distribution, plot_instance_grids_distribution,plot_error_point
 
 def point_in_hull_slow(point, hull, tolerance=1e-12):
     """
@@ -1662,7 +1664,8 @@ class DataStatistic(BalanceNode):
                                 num_obj_cat=5,
                                 num_motion_cat=3,
                                 intervals=\
-                                np.array([[0.0, 0.0], [0, 5.0], [5.0, 20.0], [20.0, 200]])) -> None:
+                                np.array([[0.0, 0.0], [0, 5.0], [5.0, 20.0], [20.0, 200]]),
+                                sensor_type = "nuscenes") -> None:
         self.dataset_root = dataset_root
         self.save_path = save_path
         self.voxel_size, self.area_extents = voxel_size, area_extents
@@ -1701,7 +1704,7 @@ class DataStatistic(BalanceNode):
         self.seq_files = sample_seq_files
 
     @staticmethod
-    def gen_2d_grid_gt_general(gt_dict: dict, category_num: int = 5):
+    def gen_2d_grid_gt_general(gt_dict: dict, category_num: int = 5, sensor_type='nuscenes'):
         dims = gt_dict['3d_dimension']
         num_future_pcs = gt_dict['num_future_pcs']
         num_past_pcs = gt_dict['num_past_pcs']
@@ -1719,9 +1722,29 @@ class DataStatistic(BalanceNode):
         pixel_cat_map = np.zeros((dims[0], dims[1], category_num), dtype=np.float32)
         pixel_cat_map[pixel_indices[:, 0], pixel_indices[:, 1], :] = sparse_pixel_cat_maps[:]
 
+        sparse_pixel_instance_maps = gt_dict['pixel_instance_ids']
+        pixel_instance_map = np.zeros((dims[0], dims[1]), dtype=np.uint8)
+        pixel_instance_map[pixel_indices[:, 0], pixel_indices[:, 1]] = sparse_pixel_instance_maps[:]
+
         non_empty_map = np.zeros((dims[0], dims[1]), dtype=np.float32)
         non_empty_map[pixel_indices[:, 0], pixel_indices[:, 1]] = 1.0
 
+        if sensor_type == "wt128_0":
+            sparse_pixel_velocity = gt_dict["pixel_velocity"]
+            all_pixel_velocity_maps = np.zeros((num_past_pcs, dims[0], dims[1]), dtype=np.float32)
+            all_pixel_velocity_maps[:, pixel_indices[:, 0], pixel_indices[:, 1]] = sparse_pixel_velocity
+
+            sparse_pixel_direction = gt_dict["pixel_direction"]
+            all_pixel_direction_maps = np.zeros((num_past_pcs, dims[0], dims[1]), dtype=np.float32)
+            all_pixel_direction_maps[:, pixel_indices[:, 0], pixel_indices[:, 1]] = sparse_pixel_direction
+
+            sparse_pixel_cos = gt_dict["pixel_cos"]
+            all_pixel_cos_maps = np.zeros((num_past_pcs, dims[0], dims[1], 3), dtype=np.float32)
+            all_pixel_cos_maps[:, pixel_indices[:, 0], pixel_indices[:, 1], :] = sparse_pixel_cos
+
+            all_pixel_velocity_maps = all_pixel_velocity_maps[..., np.newaxis][-num_past_pcs:]
+            all_pixel_direction_maps = all_pixel_direction_maps[..., np.newaxis][-num_past_pcs:]
+            
         padded_voxel_points = list()
         for i in range(num_past_pcs):
             indices = gt_dict[f"voxel_indices_{i}"]
@@ -1730,7 +1753,58 @@ class DataStatistic(BalanceNode):
             padded_voxel_points.append(curr_voxels)
         padded_voxel_points = np.stack(padded_voxel_points, 0).astype(np.float32)
 
-        return all_disp_field_gt, all_valid_pixel_maps, non_empty_map, pixel_cat_map, pixel_indices
+        # if self.sensor_type == "wt128_0" and self.use_velocity_flag:
+        #     all_pixel_velocity_maps_list = np.stack(all_pixel_velocity_maps_list, 0)
+        #     all_pixel_direction_maps_list = np.stack(all_pixel_direction_maps_list, 0)
+        #     all_pixel_cos_maps_list = np.stack(all_pixel_cos_maps_list, 0)
+
+        #     all_pixel_velocity_maps_list = all_pixel_velocity_maps_list[..., np.newaxis]
+        #     all_pixel_direction_maps_list = all_pixel_direction_maps_list[..., np.newaxis]
+        
+        if sensor_type == "wt128_0":
+            # return (
+            #     # padded_voxel_points_list,
+            #     all_disp_field_gt_list,
+            #     all_valid_pixel_maps_list,
+            #     non_empty_map_list,
+            #     pixel_cat_map_list,
+            #     # trans_matrices_list,
+            #     # motion_cat_list,
+            #     pixel_instance_map_list,
+            #     all_pixel_velocity_maps_list,
+            #     all_pixel_direction_maps_list,
+            #     all_pixel_cos_maps_list,
+            #     num_past_pcs,
+            #     num_future_pcs,
+            return (
+                # padded_voxel_points,
+                all_disp_field_gt,
+                all_valid_pixel_maps,
+                non_empty_map,
+                pixel_cat_map,
+                pixel_instance_map,
+                # motion_state_gt,
+                all_pixel_velocity_maps,
+                all_pixel_direction_maps,
+                all_pixel_cos_maps,
+                num_past_pcs,
+                num_future_pcs,
+            )
+            
+        # breakpoint()
+        # assert padded_voxel_points_list.shape == (28, 2, 5, 256, 256, 13)
+        # print(padded_voxel_points_list.shape)
+            assert padded_voxel_points_list.shape == torch.Size([2, 5, 256, 256, 13]), "mis padded voxel points"
+            if all_disp_field_gt_list.shape != torch.Size([2, 10, 256, 256, 2]):
+                print(all_disp_field_gt_list.shape)
+            assert all_disp_field_gt_list.shape == torch.Size([2, 10, 256, 256, 2]), "mis disp gt"
+            assert all_valid_pixel_maps_list.shape == torch.Size([2, 10, 256, 256]), "mis disp valid"
+            assert non_empty_map_list.shape == torch.Size([2, 256, 256]), "mis disp nonempty"
+            assert pixel_cat_map_list.shape == torch.Size([2, 256, 256, 5]), "mis pixel cat"
+            assert trans_matrices_list.shape == torch.Size([2, 20, 4, 4]), "mis trans mat"
+            assert motion_cat_list.shape == torch.Size([2, 256, 256, 2]), "mis motion tgt"
+            assert pixel_instance_map_list.shape == torch.Size([2, 256, 256]), "mis pixel id"
+        return all_disp_field_gt, all_valid_pixel_maps, non_empty_map, pixel_cat_map, pixel_instance_map, pixel_indices
 
 
     def _compute_speed_level_general(self, disp_field_gt, total_future_sweeps=20, frame_skip=3):
@@ -1825,11 +1899,12 @@ class DataStatistic(BalanceNode):
             ret_str = json.dumps(ret_dict)
             f_json.write(ret_str)
 
-
+    # def _r
 
 def compute_data_general(dataset_root=None, frame_skip=3, voxel_size=(0.25, 0.25, 0.4),
                                 split='train', area_extents = np.array([[-32., 32.], [-32., 32.], [-3., 2.]]),
                                 num_obj_cat=5,
+                                sensor_type='nuscenes',
                                 ):
 
     # class
@@ -1838,21 +1913,135 @@ def compute_data_general(dataset_root=None, frame_skip=3, voxel_size=(0.25, 0.25
         node_span=[0, 200])
     speed_intervals = interval_creator._get_interval()
 
-    data_statisticor = DataStatistic(dataset_root=dataset_root, save_path='./data',
-                                    intervals = speed_intervals)
+    save_path = os.path.join(sensor_type + "data_info", "data_info")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    data_statisticor = DataStatistic(dataset_root=dataset_root, save_path=save_path,
+                                    intervals = speed_intervals, sensor_type=sensor_type)
 
 
     # init mat
+    # breakpoint()
     num_motion_cat = speed_intervals.shape[0]
     obj_cat_cnt = np.zeros(num_obj_cat, dtype=np.int64)
     motion_cat_cnt = np.zeros(num_motion_cat, dtype=np.int64)
 
+    error_map_mean_list, error_map_sum_list, rel_error_mean_list, rel_error_sum_list = list(), list(), list(), list()
+    future_disp_mean_list, cur_disp_mean_list = list(), list()
+    instance_counts_list, instance_grid_counts_list = list(), list()
+
+    max_instance, max_grid = 0, 0
     for idx, sample_file in enumerate(data_statisticor.seq_files):
         gt_data_handle = np.load(sample_file, allow_pickle=True)
         gt_dict = gt_data_handle.item()
-        all_disp_field_gt, all_valid_pixel_maps, non_empty_map, pixel_cat_map_gt, _ \
-            = data_statisticor.gen_2d_grid_gt_general(gt_dict = gt_dict)
+        if sensor_type == 'nuscenes':
+            all_disp_field_gt, all_valid_pixel_maps, non_empty_map, pixel_cat_map_gt, pixel_instance_map_gt, _ \
+                = data_statisticor.gen_2d_grid_gt_general(gt_dict = gt_dict, sensor_type=sensor_type)
 
+        if sensor_type == 'wt128_0':
+            (
+                all_disp_field_gt,
+                all_valid_pixel_maps,
+                non_empty_map,
+                pixel_cat_map_gt,
+                pixel_instance_map_gt,
+                all_pixel_velocity_maps,
+                all_pixel_direction_maps,
+                all_pixel_cos_maps,
+                num_past_frames,
+                num_future_frames
+                    ) = data_statisticor.gen_2d_grid_gt_general(gt_dict = gt_dict, sensor_type=sensor_type)
+
+
+            non_bg_pixel_instance_map_gt_mask = pixel_instance_map_gt != 0
+            
+            #  -- Compute difference between wt128 speed and gt speed
+            all_disp_field_gt_norm = np.linalg.norm(all_disp_field_gt, ord=2, axis=-1)
+            
+            # 假设 non_bg_pixel_instance_map_gt_mask 是一个与 future_disp_field_gt_norm 和 cur_pixel_velocity_map
+            # 形状相同的布尔掩码数组，其中背景像素的位置为 False，非背景像素的位置为 True。
+            filter_mask = True
+            if filter_mask:
+                # 应用掩码，只保留非背景像素
+                cur_pixel_velocity_map = np.abs(all_pixel_velocity_maps[-1, ..., -1])[non_bg_pixel_instance_map_gt_mask]
+                future_disp_field_gt_norm = all_disp_field_gt_norm[-1, :][non_bg_pixel_instance_map_gt_mask]
+            else:
+                cur_pixel_velocity_map = np.abs(all_pixel_velocity_maps[-1, ..., -1])
+                future_disp_field_gt_norm = all_disp_field_gt_norm[-1, :]
+
+            error_map = future_disp_field_gt_norm - cur_pixel_velocity_map
+            rel_error_map = (future_disp_field_gt_norm - cur_pixel_velocity_map) / (future_disp_field_gt_norm + 1e-5)
+
+            # append future and cur disp
+            future_disp_mean = np.mean(future_disp_field_gt_norm).astype(float) if filter_mask else np.mean(all_disp_field_gt_norm[-1, :]).astype(float)
+            cur_disp_mean = np.mean(cur_pixel_velocity_map).astype(float) if filter_mask else np.mean(np.abs(all_pixel_velocity_maps[-1, ..., -1])).astype(float)
+
+            # append error sum and mean
+            single_error_sum = np.abs(np.sum(error_map)).astype(float)
+            single_error_mean = np.abs(np.mean(error_map)).astype(float) if filter_mask else np.abs(np.mean(all_disp_field_gt_norm[-1, :] - np.abs(all_pixel_velocity_maps[-1, ..., -1]))).astype(float)
+
+            # append rel error sum and mean
+            single_rel_error_sum = np.abs(np.sum(rel_error_map)).astype(float)
+            single_rel_error_mean = np.abs(np.mean(rel_error_map)).astype(float) if filter_mask else np.abs(np.mean((all_disp_field_gt_norm[-1, :] - np.abs(all_pixel_velocity_maps[-1, ..., -1])) / (all_disp_field_gt_norm[-1, :] + 1e-5))).astype(float)
+        
+            # filter_mask = True
+            # if filter_mask:
+            #     cur_pixel_velocity_map = np.abs(all_pixel_velocity_maps[-1, ..., -1] * non_bg_pixel_instance_map_gt_mask)
+            
+            #     future_disp_field_gt_norm = all_disp_field_gt_norm[-1, :, :] * non_bg_pixel_instance_map_gt_mask
+            # else:
+            #     cur_pixel_velocity_map = np.abs(all_pixel_velocity_maps[-1, ..., -1])
+            
+            #     future_disp_field_gt_norm = all_disp_field_gt_norm[-1, :, :]
+
+            # error_map = future_disp_field_gt_norm - cur_pixel_velocity_map
+            # rel_error_map = (future_disp_field_gt_norm - cur_pixel_velocity_map) / (future_disp_field_gt_norm + 1e-5)
+
+            # # append future and cur disp
+            # future_disp_mean.append(np.mean(future_disp_field_gt_norm).astype(float))
+            # cur_disp_mean.append(np.mean(cur_pixel_velocity_map).astype(float))
+
+            # # append error sum and mean
+            # single_error_sum = np.abs(np.sum(error_map)).astype(float)
+            # single_error_mean = np.abs(np.mean(error_map)).astype(float)
+
+            # # append rel error sum and mean
+            # single_rel_error_sum = np.abs(np.sum(rel_error_map)).astype(float)
+            # single_rel_error_mean = np.abs(np.mean(rel_error_map)).astype(float)
+
+            # error_map_list.append(error_map)
+            # rel_error_map_list.append(rel_error_map)
+            future_disp_mean_list.append(future_disp_mean)
+            cur_disp_mean_list.append(cur_disp_mean)
+
+            error_map_mean_list.append(single_error_mean)
+            error_map_sum_list.append(single_error_sum)
+
+            rel_error_mean_list.append(single_rel_error_mean)
+            rel_error_sum_list.append(single_rel_error_sum)
+
+        # -- get_unique instances
+        unique_instances = np.unique(pixel_instance_map_gt)
+        unique_instances = unique_instances[unique_instances != 0]
+
+        num_unique_instances = len(unique_instances)
+        # 统计每个实例ID的网格数量
+        instance_counts = np.bincount(pixel_instance_map_gt.flatten())
+        instance_counts = instance_counts[unique_instances]
+        
+        instance_counts_list.append(num_unique_instances)
+        if num_unique_instances != 0:
+            temp_max_instance_grid_counts = np.max(instance_counts)
+            if temp_max_instance_grid_counts > max_grid:
+                max_grid = temp_max_instance_grid_counts
+
+        instance_grid_counts_list.append(instance_counts.tolist())
+        if num_unique_instances > max_instance:
+            max_instance = num_unique_instances
+        
+        
+
+        # breakpoint()
         # -- Compute speed level ground truth
         # motion_status_gt = compute_speed_level(all_disp_field_gt, frame_skip=frame_skip)
         motion_status_gt = \
@@ -1901,18 +2090,111 @@ def compute_data_general(dataset_root=None, frame_skip=3, voxel_size=(0.25, 0.25
     # TODO: save the statistic info and obtain the weight for speed intervals
     weight, inverse_weight = data_statisticor._get_speed_level_weight(cat_cnt=motion_cat_cnt)
 
-    ret_dict = dict(
-        # statistic_info
-        obj_cls_sat = obj_cat_cnt.tolist(),
-        motion_cls_sat = motion_cat_cnt.tolist(),
-        obj_cls_ratio_sat = obj_cat_ratio.tolist(),
-        motion_cls_ratio_sta = motion_cat_ratio.tolist(),
-        motion_cls_reverse_ratio_sta = motion_cat_ratio_inverse.tolist(),
-        motion_weight = weight.tolist(),
-        motion_new_weight = inverse_weight.tolist()
-    )
+    print("The max instance:{}, The max grid:{}".format(max_instance, max_grid))
+    if sensor_type == 'wt128_0':
+        ret_dict = dict(
+            # statistic_info
+            obj_cls_sat = obj_cat_cnt.tolist(),
+            motion_cls_sat = motion_cat_cnt.tolist(),
+            obj_cls_ratio_sat = obj_cat_ratio.tolist(),
+            motion_cls_ratio_sta = motion_cat_ratio.tolist(),
+            motion_cls_reverse_ratio_sta = motion_cat_ratio_inverse.tolist(),
+            motion_weight = weight.tolist(),
+            motion_new_weight = inverse_weight.tolist(),
+            future_disp_mean = future_disp_mean_list,
+            cur_disp_mean = cur_disp_mean_list,
+            error_map_mean = error_map_mean_list,
+            rel_error_map_mean = rel_error_mean_list,
+            error_map_sum = error_map_sum_list,
+            rel_error_map_sum = rel_error_sum_list,
+            instance_counts_list = instance_counts_list, # save the number of instances in certain sample
+            instance_grid_counts_list = instance_grid_counts_list, # save the number of grid in the instances in certain sample
+        )
+    elif sensor_type == 'nuscenes':
+        ret_dict = dict(
+            # statistic_info
+            obj_cls_sat = obj_cat_cnt.tolist(),
+            motion_cls_sat = motion_cat_cnt.tolist(),
+            obj_cls_ratio_sat = obj_cat_ratio.tolist(),
+            motion_cls_ratio_sta = motion_cat_ratio.tolist(),
+            motion_cls_reverse_ratio_sta = motion_cat_ratio_inverse.tolist(),
+            motion_weight = weight.tolist(),
+            motion_new_weight = inverse_weight.tolist(),
+            # future_disp_mean = future_disp_mean,
+            # cur_disp_mean = cur_disp_mean,
+            # error_map_mean = error_map_mean_list,
+            # rel_error_map_mean = rel_error_mean_list,
+            # error_map_sum = error_map_sum_list,
+            # rel_error_map_sum = rel_error_sum_list,
+            instance_counts_list = instance_counts_list, # save the number of instances in certain sample
+            instance_grid_counts_list = instance_grid_counts_list, # save the number of grid in the instances in certain sample
+        )
     data_statisticor._save_statistic_info(ret_dict=ret_dict)
 
 
 if __name__ == "__main__":
-    compute_data_general(dataset_root='/home/qianka/Motion/WeakMotion/WeakMotion-New-2/data/input-data/trainval')
+    # statistic nuscenes
+    
+    # breakpoint()
+    # statistic wt128_0
+    # compute_data_general(dataset_root='/mnt/personal/qiankangan/all_wt128_0/train', \
+    #                     frame_skip=0, voxel_size=(0.25, 0.25, 0.4),
+    #                             split='train', area_extents = np.array([[0., 64.], [-32., 32.], [-2., 3.]]),
+    #                             num_obj_cat=5,
+    #                             sensor_type='wt128_0')
+    # compute_data_general(dataset_root='/mnt/personal/qiankangan/input-data/')
+    
+    # Load your data dictionary
+    ret_dict = np.load("/home/qiankangan/UniGenMotionNet/data/wt128_0data_info/data_info/data_statistic_info.npy", allow_pickle=True).item()
+    
+    
+    # Extract necessary data
+    future_disp_mean = ret_dict['future_disp_mean']
+    cur_disp_mean = ret_dict['cur_disp_mean']
+    error_map_mean = ret_dict['error_map_mean']  # Assuming this is the mean error map
+    rel_error_map_mean = ret_dict['rel_error_map_mean']  # Assuming this is the mean relative error map
+    
+    # Calculate errors
+    error = error_map_mean
+    error_point = []
+    for cur, future in zip(cur_disp_mean, future_disp_mean):
+        error_point.append( np.abs(cur-future))
+    
+    error_vector = np.array(error_point)
+    # 去除 NaN 值
+    error_vector = error_vector[~np.isnan(error_vector)]
+    # 计算平均数
+    mean_value = np.mean(error_vector)
+
+    # 计算中位数
+    median_value = np.median(error_vector)
+
+    # 计算最大值
+    max_value = np.max(error_vector)
+
+    # 计算最小值
+    min_value = np.min(error_vector)
+
+    # 计算方差
+    variance_value = np.var(error_vector)
+
+    # 输出结果
+    print("Mean:", mean_value)
+    print("Median:", median_value)
+    print("Max:", max_value)
+    print("Min:", min_value)
+    print("Variance:", variance_value)
+
+    # Generate plots
+    plot_true_vs_measured(future_disp_mean, cur_disp_mean, save_path='true_vs_measured.png')
+    plot_error_distribution(error, save_path='error_distribution.png')
+    plot_error_point(error_point, save_path='error_point_distribution.png')
+
+    ret_nusc_dict = np.load("/home/qiankangan/UniGenMotionNet/data/nuscenesdata_info/data_info/data_statistic_info.npy", allow_pickle=True).item()
+    # Assuming ret_dict is already loaded from your data source
+    instance_counts_list = ret_dict['instance_counts_list']
+    instance_grid_counts_list = ret_dict['instance_grid_counts_list']
+    
+    # Generate and save plots
+    plot_instance_counts_distribution(instance_counts_list, save_path='instance_counts_distribution.png')
+    plot_instance_grids_distribution(instance_grid_counts_list, save_path='instance_grids_distribution.png')

@@ -1,0 +1,324 @@
+--------------------------------------------------------------
+For cells within speed range [0.0, 0.0]:
+
+Frame 1:
+The mean error is 3.1541150320733237e-06
+The 50% error quantile is 0.0
+Frame 2:
+The mean error is 6.128452287778992e-06
+The 50% error quantile is 0.0
+Frame 3:
+The mean error is 8.96648158880992e-06
+The 50% error quantile is 0.0
+Frame 4:
+The mean error is 1.1557332288344609e-05
+The 50% error quantile is 0.0
+Frame 5:
+The mean error is 1.4109829760171271e-05
+The 50% error quantile is 0.0
+Frame 6:
+The mean error is 1.6685454693350646e-05
+The 50% error quantile is 0.0
+Frame 7:
+The mean error is 1.9251245290248788e-05
+The 50% error quantile is 0.0
+Frame 8:
+The mean error is 2.1742081976013827e-05
+The 50% error quantile is 0.0
+Frame 9:
+The mean error is 2.4137503776999964e-05
+The 50% error quantile is 0.0
+Frame 10:
+The mean error is 2.6434529685825262e-05
+The 50% error quantile is 0.0
+Frame 11:
+The mean error is 2.7458828031019978e-05
+The 50% error quantile is 0.0
+Frame 12:
+The mean error is 2.9501477021786225e-05
+The 50% error quantile is 0.0
+Frame 13:
+The mean error is 3.1581657911865607e-05
+The 50% error quantile is 0.0
+Frame 14:
+The mean error is 3.3681125013385736e-05
+The 50% error quantile is 0.0
+Frame 15:
+The mean error is 3.577541353840031e-05
+The 50% error quantile is 0.0
+Frame 16:
+The mean error is 3.7871942537505574e-05
+The 50% error quantile is 0.0
+Frame 17:
+The mean error is 3.9970740900188584e-05
+The 50% error quantile is 0.0
+Frame 18:
+The mean error is 4.2087905503988033e-05
+The 50% error quantile is 0.0
+Frame 19:
+The mean error is 4.423892331296448e-05
+The 50% error quantile is 0.0
+Frame 20:
+The mean error is 4.65499159478412e-05
+The 50% error quantile is 0.0
+--------------------------------------------------------------
+
+--------------------------------------------------------------
+For cells within speed range [0.0, 5.0]:
+
+Frame 1:
+The mean error is 0.0036765207818186285
+The 50% error quantile is 0.0
+Frame 2:
+The mean error is 0.007183948660978014
+The 50% error quantile is 0.0
+Frame 3:
+The mean error is 0.010696890392022148
+The 50% error quantile is 0.0
+Frame 4:
+The mean error is 0.014218313779188332
+The 50% error quantile is 0.0
+Frame 5:
+The mean error is 0.017705749029811795
+The 50% error quantile is 0.0
+Frame 6:
+The mean error is 0.021191150683948185
+The 50% error quantile is 0.0
+Frame 7:
+The mean error is 0.024729474806841113
+The 50% error quantile is 0.0
+Frame 8:
+The mean error is 0.02825130808058597
+The 50% error quantile is 0.0
+Frame 9:
+The mean error is 0.0316103919770027
+The 50% error quantile is 0.0
+Frame 10:
+The mean error is 0.03490322113272881
+The 50% error quantile is 0.0
+Frame 11:
+The mean error is 0.037300389635549006
+The 50% error quantile is 0.0
+Frame 12:
+The mean error is 0.040009188606454534
+The 50% error quantile is 0.0
+Frame 13:
+The mean error is 0.042858339453830906
+The 50% error quantile is 0.0
+Frame 14:
+The mean error is 0.04583283092608829
+The 50% error quantile is 0.0
+Frame 15:
+The mean error is 0.04892720390409574
+The 50% error quantile is 0.0
+Frame 16:
+The mean error is 0.052134240699940236
+The 50% error quantile is 0.0
+Frame 17:
+The mean error is 0.055420292996360386
+The 50% error quantile is 0.0
+Frame 18:
+The mean error is 0.0588029126263458
+The 50% error quantile is 0.0
+Frame 19:
+The mean error is 0.062048191390911916
+The 50% error quantile is 0.0
+Frame 20:
+The mean error is 0.06543052927770776
+The 50% error quantile is 0.0
+--------------------------------------------------------------
+
+--------------------------------------------------------------
+For cells within speed range [5.0, 20.0]:
+
+Frame 1:
+The mean error is 0.011884822933036807
+The 50% error quantile is 0.0
+Frame 2:
+The mean error is 0.02189797734822395
+The 50% error quantile is 0.0
+Frame 3:
+The mean error is 0.03275118796655664
+The 50% error quantile is 0.0
+Frame 4:
+The mean error is 0.04324429165246012
+The 50% error quantile is 0.0
+Frame 5:
+The mean error is 0.053422856746791314
+The 50% error quantile is 0.0
+Frame 6:
+The mean error is 0.06336667619953204
+The 50% error quantile is 0.0
+Frame 7:
+The mean error is 0.07295093869747395
+The 50% error quantile is 0.0
+Frame 8:
+The mean error is 0.0827223243826348
+The 50% error quantile is 0.0
+Frame 9:
+The mean error is 0.0921828549232853
+The 50% error quantile is 0.0
+Frame 10:
+The mean error is 0.10268238531753203
+The 50% error quantile is 0.0
+Frame 11:
+The mean error is 0.11181162648961987
+The 50% error quantile is 0.0
+Frame 12:
+The mean error is 0.12138177780284827
+The 50% error quantile is 0.0
+Frame 13:
+The mean error is 0.13106962898072236
+The 50% error quantile is 0.0
+Frame 14:
+The mean error is 0.14107154570413008
+The 50% error quantile is 0.0
+Frame 15:
+The mean error is 0.15188632694885862
+The 50% error quantile is 0.0
+Frame 16:
+The mean error is 0.16266449005948927
+The 50% error quantile is 0.0
+Frame 17:
+The mean error is 0.1731877450748478
+The 50% error quantile is 0.0
+Frame 18:
+The mean error is 0.18353131959907742
+The 50% error quantile is 0.0
+Frame 19:
+The mean error is 0.19449836481299304
+The 50% error quantile is 0.0
+Frame 20:
+The mean error is 0.2058562040860349
+The 50% error quantile is 0.0
+--------------------------------------------------------------
+
+Mean pixel classification accuracy: 0.9353609036807257
+mean cat accuracy of Bg: 0.9428375871893039
+mean cat accuracy of Vehicle: 0.9335968509282425
+mean cat accuracy of Ped: 0.8414397224631396
+mean cat accuracy of Bike: 0.3349945828819068
+mean cat accuracy of Others: 0.8055959989295123
+mean instance acc: 0.771692948478421
+
+Reshape the displacement prediction statistics into a column:
+3.1541150320733237e-06
+6.128452287778992e-06
+8.96648158880992e-06
+1.1557332288344609e-05
+1.4109829760171271e-05
+1.6685454693350646e-05
+1.9251245290248788e-05
+2.1742081976013827e-05
+2.4137503776999964e-05
+2.6434529685825262e-05
+2.7458828031019978e-05
+2.9501477021786225e-05
+3.1581657911865607e-05
+3.3681125013385736e-05
+3.577541353840031e-05
+3.7871942537505574e-05
+3.9970740900188584e-05
+4.2087905503988033e-05
+4.423892331296448e-05
+4.65499159478412e-05
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0036765207818186285
+0.007183948660978014
+0.010696890392022148
+0.014218313779188332
+0.017705749029811795
+0.021191150683948185
+0.024729474806841113
+0.02825130808058597
+0.0316103919770027
+0.03490322113272881
+0.037300389635549006
+0.040009188606454534
+0.042858339453830906
+0.04583283092608829
+0.04892720390409574
+0.052134240699940236
+0.055420292996360386
+0.0588029126263458
+0.062048191390911916
+0.06543052927770776
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.011884822933036807
+0.02189797734822395
+0.03275118796655664
+0.04324429165246012
+0.053422856746791314
+0.06336667619953204
+0.07295093869747395
+0.0827223243826348
+0.0921828549232853
+0.10268238531753203
+0.11181162648961987
+0.12138177780284827
+0.13106962898072236
+0.14107154570413008
+0.15188632694885862
+0.16266449005948927
+0.1731877450748478
+0.18353131959907742
+0.19449836481299304
+0.2058562040860349
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0

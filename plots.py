@@ -16,15 +16,15 @@ from nuscenes.utils.data_classes import Box, LidarPointCloud
 from pyquaternion import Quaternion
 
 from data.data_utils import calc_displace_vector, point_in_hull_fast, voxelize_occupy
-from model import FeatEncoder, MotionNet, MotionNetMGDA
-
+from model.model import FeatEncoder, MotionNet, MotionNetMGDA
+from model.en_model import En_MotionNet, GAN_MotionNet, GAN_MotionNetV2, En_GAN_MotionNet, En_GAN_MotionNetV2, MotionNetVAE, GRUMotionNetVAE, UniGRUMotionNetVAE, UniGridInsGRUMotionNetVAE
 color_map = {0: "c", 1: "m", 2: "k", 3: "y", 4: "r"}
 cat_names = {0: "bg", 1: "bus", 2: "ped", 3: "bike", 4: "other"}
 
 
 def check_folder(folder_path):
     if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
+        os.makedirs(folder_path)
     return folder_path
 
 
@@ -94,6 +94,15 @@ def vis_scene_data(
     loaded_models = list()
     if which_model == "MotionNet":
         model = MotionNet(out_seq_len=20, motion_category_num=2, height_feat_size=13)
+
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(trained_model_path)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model = model.to(device)
+
+        loaded_models = [model]
+    elif which_model == "GRUVAE":
+        model = GRUMotionNetVAE(out_seq_len=20, motion_category_num=2, height_feat_size=13)
 
         model = nn.DataParallel(model)
         checkpoint = torch.load(trained_model_path)
@@ -400,7 +409,7 @@ def gen_2d_grid_gt_for_visualization(
     # Get the point cloud subsets, which are inside different instance bounding boxes
     refer_box_list = list()
     refer_pc_idx_per_bbox = list()
-    points_category = np.zeros(refer_pc.shape[0], dtype=np.int)  # store the point categories
+    points_category = np.zeros(refer_pc.shape[0], dtype=int)  # store the point categories
 
     for i in range(num_instances):
         instance_cat = instance_cat_list[i]
@@ -492,7 +501,7 @@ def gen_2d_grid_gt_for_visualization(
         disp_field = np.zeros([unique_indices.shape[0], 2], dtype=np.float32)  # we only consider the 2D field
 
         # We only compute loss for valid pixels where there are corresponding box annotations between two frames
-        valid_pixels = np.zeros(unique_indices.shape[0], dtype=np.bool)
+        valid_pixels = np.zeros(unique_indices.shape[0], dtype=bool)
 
         for h, v in enumerate(zip(unique_indices, num_points_in_pixel)):
 
@@ -575,7 +584,7 @@ def vis_model_per_sample_data(
     fig, ax = plt.subplots(1, 3, figsize=(20, 8))
 
     # Load pre-trained network weights
-    if which_model == "MotionNet":
+    if which_model == "MotionNet" or which_model == "GRUVAE":
         model = loaded_models[0]
     else:
         model_encoder = loaded_models[0]
@@ -595,7 +604,7 @@ def vis_model_per_sample_data(
     padded_voxel_points = torch.unsqueeze(padded_voxel_points, 0).to(device)
 
     # Make prediction
-    if which_model == "MotionNet":
+    if which_model == "MotionNet" or which_model == "GRUVAE":
         model.eval()
     else:
         model_encoder.eval()
@@ -604,6 +613,9 @@ def vis_model_per_sample_data(
     with torch.no_grad():
         if which_model == "MotionNet":
             disp_pred, cat_pred, motion_pred = model(padded_voxel_points)
+        
+        elif which_model == "GRUVAE":
+            disp_pred, cat_pred, motion_pred, _ = model(padded_voxel_points)
         else:
             shared_feats = model_encoder(padded_voxel_points)
             disp_pred, cat_pred, motion_pred = model_head(shared_feats)
@@ -680,10 +692,10 @@ def vis_model_per_sample_data(
     max_prob = np.amax(pixel_cat_map_gt, axis=-1)
     filter_mask = max_prob == 1.0
     pixel_cat_map = np.argmax(pixel_cat_map_gt, axis=-1) + 1  # category starts from 1 (background), etc
-    pixel_cat_map = (pixel_cat_map * non_empty_map * filter_mask).astype(np.int)
+    pixel_cat_map = (pixel_cat_map * non_empty_map * filter_mask).astype(int)
 
     cat_pred = np.argmax(cat_pred, axis=0) + 1
-    cat_pred = (cat_pred * non_empty_map * filter_mask).astype(np.int)
+    cat_pred = (cat_pred * non_empty_map * filter_mask).astype(int)
 
     # --- Visualization ---
     idx = num_past_pcs - 1
@@ -721,6 +733,7 @@ def vis_model_per_sample_data(
         # For cells with very small movements, we threshold them to be static
         field_gt_norm = np.linalg.norm(field_gt, ord=2, axis=-1)  # out: (h, w)
         thd_mask = field_gt_norm <= 0.4
+        gt_thd_mask = thd_mask
         field_gt[thd_mask, :] = 0
 
         # Get the displacement field
@@ -746,6 +759,7 @@ def vis_model_per_sample_data(
         field_pred_norm = np.linalg.norm(field_pred, ord=2, axis=-1)  # out: (h, w)
         thd_mask = field_pred_norm <= 0.4
         field_pred[thd_mask, :] = 0
+        # field_pred[gt_thd_mask, :] = 0
 
         # We use the same indices as the ground-truth, since we are currently focused on the foreground
         X_pred = idx_x[mask_pred]

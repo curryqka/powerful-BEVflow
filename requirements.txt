@@ -4,9 +4,11 @@
 
 pyquaternion
 matplotlib
-numpy
+numpy==1.24
 opencv-python
 tqdm
 torch
 Pillow
 nuscenes-devkit
+numba
+imageio

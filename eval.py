@@ -11,10 +11,29 @@ import torch.nn as nn
 from sklearn.metrics import confusion_matrix
 
 from data.nuscenes_dataloader import DatasetSingleSeq
-from model import FeatEncoder, MotionNet, MotionNetMGDA
+# from model import FeatEncoder, MotionNet, MotionNetMGDA
+from utlis.model_utlis import *
+from model.model import MotionNetMGDA, MotionNet, GeneralMotionNet, MixGeneralMotionNet, VAE_GeneralMotionNet
+from model.en_model import En_MotionNet, GAN_MotionNet, GAN_MotionNetV2, En_GAN_MotionNet, En_GAN_MotionNetV2, GRUMotionNetVAE, UniGridInsGRUMotionNetVAE
+# from model.model_ablation import 
+from model.model_ablation import UniGridGenMotionNet, MulUniGridInsGRUMotionNetVAE, MulUniGridInsGRUMotionNetVAE64x64, MulUniGridInsGRUMotionNetVAE32x32, GRUMotionNetVAEV2
+from model.be_sti import MotionNet as besti
+from model.be_sti import GeneralMotionNet as Generalbesti
+from model.en_gan_model import FeatEncoder, MotionNetGenerator
 
 color_map = {0: "c", 1: "m", 2: "k", 3: "y", 4: "r"}
 cat_names = {0: "bg", 1: "bus", 2: "ped", 3: "bike", 4: "other"}
+'''
+check whether the folder exists, if not, create one
+'''
+def check_folder(folder_path):
+    if len(folder_path.split('/')) >= 2:
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+    else:
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
+    return folder_path
 
 
 def eval_motion_displacement(
@@ -33,6 +52,9 @@ def eval_motion_displacement(
     height_feat_size=13,
     num_obj_category=5,
     which_model="MotionNet",
+    general_flag=False,
+    use_noise=False, noise_factor=0.1, 
+    sensor_type="nuscenes", args=None
 ):
     """
     Evaluate the motion prediction results.
@@ -55,32 +77,115 @@ def eval_motion_displacement(
         raise ValueError("Need to specify saved model path, log file save path and [val/test] dataset path.")
     if save_eval_file_path is None:
         warnings.warn("Did not specify the file path for saving the evaluation results.")
-
+    
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    dataset = DatasetSingleSeq(
-        dataset_root=dataset_path,
-        split=split,
-        future_frame_skip=future_frame_skip,
-        voxel_size=voxel_size,
-        area_extents=area_extents,
-        num_category=num_obj_category,
-    )
+    
+    dataset = DatasetSingleSeq(dataset_root=dataset_path, split=split, future_frame_skip=future_frame_skip,
+                               use_velocity_flag=args.use_v,
+                               voxel_size=voxel_size, area_extents=area_extents, num_category=num_obj_category,
+                               sensor_type=sensor_type,
+                               debug_mode=args.debug)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     # Specify the file for storing the evaluation results
     if save_eval_file_path is not None:
-        logger_file = os.path.join(save_eval_file_path, "eval_displacement.txt")
+        logger_file = os.path.join(save_eval_file_path, 'eval_displacement.txt')
+        save_eval_file_path = check_folder(save_eval_file_path)
         saver = open(logger_file, "w")
 
     # Load pre-trained network weights
-    if which_model == "MotionNet":
-        model = MotionNet(out_seq_len=20, motion_category_num=2, height_feat_size=height_feat_size)
+    if which_model == 'MotionNet' or which_model == 'be-sti':
+        # model = GeneralMotionNet(out_seq_len=10, motion_category_num=2, height_feat_size=height_feat_size)
+        if args.use_v and args.use_vdir:
+            if which_model == 'MotionNet':
+                model = GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+            elif which_model == 'be-sti':
+                model = Generalbesti(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+        elif args.use_v and not args.use_vdir:
+            if which_model == 'MotionNet':
+                model = GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+            elif which_model == 'be-sti':
+                model = Generalbesti(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+        else:
+            if which_model == 'MotionNet':
+                model = MotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+            elif which_model == 'be-sti':
+                model = besti(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
         model = nn.DataParallel(model)
         checkpoint = torch.load(model_path)
-        model.load_state_dict(checkpoint["model_state_dict"])
+        model.load_state_dict(checkpoint['model_state_dict'])
         model = model.to(device)
-    else:  # MotionNetMGDA
+    elif which_model == "MixGeneralMotionNet":
+        if args.use_v and args.use_vdir:
+            model = MixGeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size,
+                                    with_direction=True)
+        elif args.use_v and not args.use_vdir:
+            model = MixGeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size,
+                                    with_direction=False)
+        else:
+            model = MotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+    elif which_model == "UniGenMotionNet":
+        # Generative + velocity
+        if args.use_v and args.use_vdir:
+            model = VAE_GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+        elif args.use_v and not args.use_vdir:
+            model = VAE_GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+        else:
+            model = VAE_GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+    elif which_model == "GRUMotionNetVAE":
+        if args.use_v and args.use_vdir:
+            model =  GRUMotionNetVAE(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+        elif args.use_v and not args.use_vdir:
+            model =  GRUMotionNetVAE(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+        else:
+            model =  GRUMotionNetVAE(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+    elif which_model == "UniGridGenMotionNet":
+        if args.use_v and args.use_vdir:
+            model =  UniGridGenMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+        elif args.use_v and not args.use_vdir:
+            model =  UniGridGenMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+        else:
+            model =  UniGridGenMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+    
+    elif which_model == "UniInsGridGenMotionNet":
+        model =  UniGridInsGRUMotionNetVAE(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+
+    elif which_model == "MulUniGridInsGRUMotionNetVAE64x64":
+        model =  MulUniGridInsGRUMotionNetVAE64x64(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+    
+    elif which_model == "MulUniGridInsGRUMotionNetVAE32x32":
+        model = MulUniGridInsGRUMotionNetVAE32x32(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+
+    elif which_model == "MotionNetMGDA":  # MotionNetMGDA
         model_encoder = FeatEncoder()
         model_head = MotionNetMGDA(out_seq_len=20, motion_category_num=2)
 
@@ -88,22 +193,63 @@ def eval_motion_displacement(
         model_head = nn.DataParallel(model_head)
 
         checkpoint = torch.load(model_path)
-        model_encoder.load_state_dict(checkpoint["encoder_state_dict"])
-        model_head.load_state_dict(checkpoint["head_state_dict"])
+        model_encoder.load_state_dict(checkpoint['encoder_state_dict'])
+        model_head.load_state_dict(checkpoint['head_state_dict'])
 
         model_encoder = model_encoder.to(device)
         model_head = model_head.to(device)
+    elif which_model == "En_MotionNet":
+        model = En_MotionNet(out_seq_len=20, motion_category_num=2, height_feat_size=height_feat_size)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+    elif which_model == "GAN_MotionNet":
+        model = GAN_MotionNet(out_seq_len=20, motion_category_num=2)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+    elif which_model == "GAN_MotionNetV2":
+        model = GAN_MotionNetV2(out_seq_len=20, motion_category_num=2)
+        # model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+    elif which_model == "En_GAN_MotionNet":
+        model = En_GAN_MotionNet(out_seq_len=20, motion_category_num=2)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+    elif which_model == "En_GAN_MotionNetV2":
+        model = En_GAN_MotionNetV2(out_seq_len=20, motion_category_num=2)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+    elif which_model == "MotionNetGAN":
+        model = FeatEncoder()
+        generator = MotionNetGenerator()
+        model = nn.DataParallel(model)
+        generator = nn.DataParallel(generator)
+        checkpoint = torch.load(model_path)
+        # breakpoint()
+        model.load_state_dict(checkpoint['model_state_dict'])
+        generator.load_state_dict(checkpoint['generator_model_state_dict'])
+        model = model.to(device=device)
+        generator = generator.to(device=device)
 
     # The speed intervals for grouping the cells
     # speed_intervals = np.array([[0.0, 0.0], [0, 5.0], [5.0, 20.0]])  # unit: m/s
     # We do not consider > 20m/s, since objects in nuScenes appear inside city and rarely exhibit very high speed
     speed_intervals = np.array([[0.0, 0.0], [0, 5.0], [5.0, 20.0]])
     selected_future_sweeps = np.arange(
-        0, num_future_sweeps + 1, 3 + 1
+        0, num_future_sweeps + 1, future_frame_skip + 1
     )  # We evaluate predictions at [0.2, 0.4, ..., 1]s
     selected_future_sweeps = selected_future_sweeps[1:]
     last_future_sweep_id = selected_future_sweeps[-1]
-    distance_intervals = speed_intervals * (last_future_sweep_id / 20.0)  # "20" is because the LIDAR scanner is 20Hz
+    distance_intervals = speed_intervals * (last_future_sweep_id / num_future_sweeps)  # "20" is because the LIDAR scanner is 20Hz
 
     cell_groups = list()  # grouping the cells with different speeds
     for i in range(distance_intervals.shape[0]):
@@ -115,7 +261,15 @@ def eval_motion_displacement(
         cell_groups.append(cell_statistics)
 
     # Make prediction
-    if which_model == "MotionNet":
+    if which_model == ('MotionNet' or 'En_MotionNet') or which_model == 'be-sti' or which_model == 'UniGenMotionNet' \
+                    or which_model == 'MixGeneralMotionNet' or which_model == "GRUMotionNetVAE":
+        model.eval()
+    elif which_model == "UniGridGenMotionNet":
+        model.eval()
+    elif which_model == "UniInsGridGenMotionNet":
+        model.eval()
+    
+    elif which_model == "MulUniGridInsGRUMotionNetVAE64x64" or which_model == "MulUniGridInsGRUMotionNetVAE32x32":
         model.eval()
     else:
         model_encoder.eval()
@@ -126,25 +280,105 @@ def eval_motion_displacement(
     overall_cls_gt = list()  # to compute classification accuracy for each object category
 
     for i, data in enumerate(dataloader, 0):
-        (
-            padded_voxel_points,
-            all_disp_field_gt,
-            all_valid_pixel_maps,
-            non_empty_map,
-            pixel_cat_map_gt,
-            past_steps,
-            future_steps,
-            motion_gt,
-        ) = data
+        if sensor_type == "nuscenes" or sensor_type == "at128_0" or not args.use_v:
+            padded_voxel_points, all_disp_field_gt, all_valid_pixel_maps, \
+                non_empty_map, pixel_cat_map_gt, pixel_instance_map_gt, past_steps, future_steps, motion_gt = data
+        
+        elif sensor_type == "wt128_0" and args.use_v:
+            padded_voxel_points, all_disp_field_gt, all_valid_pixel_maps, \
+                non_empty_map, pixel_cat_map_gt, pixel_instance_map_gt, past_steps, future_steps, motion_gt, \
+                all_pixel_velocity_maps, all_pixel_direction_maps, all_pixel_cos_maps = data
+
+            all_pixel_velocity_maps = all_pixel_velocity_maps.to(device)
+            all_pixel_direction_maps = all_pixel_direction_maps.to(device)
 
         padded_voxel_points = padded_voxel_points.to(device)
+        if general_flag:
+            # segment
+            pixel_cat_map_gt_numpy = pixel_cat_map_gt.numpy()
+            non_empty_map_numpy = non_empty_map.numpy()
+            # class_pred_numpy = class_pred.cpu().numpy()
+
+            # Convert the category map
+            max_prob = np.amax(pixel_cat_map_gt_numpy, axis=-1)
+            filter_mask = max_prob == 1.0  # Note: some of the cell probabilities are soft probabilities
+            pixel_cat_map_numpy = np.argmax(pixel_cat_map_gt_numpy, axis=-1) + 1  # category starts from 1 (background), etc
+
+            # Convert category label to nongernal label
+            cat_nongeneral_map = np.zeros_like(pixel_cat_map_numpy)
+            cat_nongeneral_map[pixel_cat_map_numpy == 5] = 1
+        
+        noise:torch.tensor = noise_sample_ACGAN(batch_size=padded_voxel_points.shape[0], n_z=32, n_size=256).to(device)
+        if use_noise:
+            noise = noise * noise_factor
+        else:
+            noise = noise * 0.0
 
         with torch.no_grad():
-            if which_model == "MotionNet":
-                disp_pred, class_pred, motion_pred = model(padded_voxel_points)
-            else:
-                shared_feats = model_encoder(padded_voxel_points)
-                disp_pred, class_pred, motion_pred = model_head(shared_feats)
+            with torch.no_grad():
+                if which_model == ('MotionNet' or 'En_MotionNet') or which_model == 'be-sti' \
+                    or which_model == 'MixGeneralMotionNet':
+                    # disp_pred, class_pred, motion_pred = model(padded_voxel_points, None, None)
+                    if args.use_v and args.use_vdir:
+                        disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps, all_pixel_direction_maps)
+                    elif args.use_v and not args.use_vdir:
+                        disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps) 
+                    else:
+                        disp_pred, class_pred, motion_pred = model(padded_voxel_points) 
+                elif which_model == "UniGenMotionNet":
+                    if args.use_v and args.use_vdir:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points, prior_velocity=all_pixel_velocity_maps, prior_direction=all_pixel_direction_maps)
+                    elif args.use_v and not args.use_vdir:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points, all_pixel_velocity_maps) 
+                    else:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points)
+                elif which_model == "GRUMotionNetVAE":
+                    if args.use_v and args.use_vdir:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points, prior_velocity=all_pixel_velocity_maps, prior_direction=all_pixel_direction_maps)
+                    elif args.use_v and not args.use_vdir:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points, all_pixel_velocity_maps) 
+                    else:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points)
+                
+                elif which_model == "UniGridGenMotionNet":
+                    if args.use_v and args.use_vdir:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points, prior_velocity=all_pixel_velocity_maps, prior_direction=all_pixel_direction_maps)
+                    elif args.use_v and not args.use_vdir:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points, all_pixel_velocity_maps) 
+                    else:
+                        disp_pred, class_pred, motion_pred, _, _ = model(padded_voxel_points)
+                
+                elif which_model == "UniInsGridGenMotionNet":
+                    if args.use_v and args.use_vdir:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points, prior_velocity=all_pixel_velocity_maps, prior_direction=all_pixel_direction_maps)
+                    elif args.use_v and not args.use_vdir:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points, all_pixel_velocity_maps) 
+                    else:
+                        disp_pred, class_pred, motion_pred, _, _ = model(padded_voxel_points)
+
+                elif which_model == "MulUniGridInsGRUMotionNetVAE64x64" or which_model == "MulUniGridInsGRUMotionNetVAE32x32":
+                    if args.use_v and args.use_vdir:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points, prior_velocity=all_pixel_velocity_maps, prior_direction=all_pixel_direction_maps)
+                    elif args.use_v and not args.use_vdir:
+                        disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points, all_pixel_velocity_maps) 
+                    else:
+                        disp_pred, class_pred, motion_pred, _, _ = model(padded_voxel_points)
+
+                        
+                elif which_model in ['GAN_MotionNet', 'En_GAN_MotionNet']:
+                    disp_pred, class_pred, motion_pred, aux_disp_pred, aux_class_pred, aux_motion_pred = model(padded_voxel_points,noise)
+                elif which_model in ['GAN_MotionNetV2', 'En_GAN_MotionNetV2']:
+                    disp_pred, class_pred, motion_pred, aux_disp_pred, aux_class_pred, aux_motion_pred = model(padded_voxel_points,noise)
+                elif which_model == "MotionNetGAN":
+                    # Make prediction, aux prediction
+                    feat = model(padded_voxel_points
+                                )
+                    
+                    disp_pred, class_pred, motion_pred, \
+                        aux_disp_pred, aux_class_pred, aux_motion_pred = generator(feat, noise)
+                else:
+                    shared_feats = model_encoder(padded_voxel_points)
+                    disp_pred, class_pred, motion_pred = model_head(shared_feats)
 
             pred_shape = disp_pred.size()
             disp_pred = disp_pred.view(all_disp_field_gt.size(0), -1, pred_shape[-3], pred_shape[-2], pred_shape[-1])
@@ -176,6 +410,9 @@ def eval_motion_displacement(
                 cat_weight_map = cat_weight_map[:, np.newaxis, np.newaxis, ...]  # (batch, 1, 1, h, w)
 
                 disp_pred = disp_pred * cat_weight_map
+                if general_flag:
+                    cat_nongeneral_map = cat_nongeneral_map[:, np.newaxis, np.newaxis, ...] # (batch, 1, 1, h, w)
+                    disp_pred = disp_pred * cat_nongeneral_map
 
         # Pre-processing
         all_disp_field_gt = all_disp_field_gt.numpy()  # (bs, seq, h, w, channel)
@@ -197,7 +434,7 @@ def eval_motion_displacement(
         # Compute the static and moving cell masks, and
         # Iterate through the distance intervals and group the cells based on their speeds;
         upper_thresh = 0.2
-        upper_bound = (future_frame_skip + 1) / 20 * upper_thresh
+        upper_bound = (future_frame_skip + 1) / out_seq_len * upper_thresh
 
         static_cell_mask = all_disp_field_gt_norm <= upper_bound
         static_cell_mask = np.all(static_cell_mask, axis=1)  # along the temporal axis
@@ -225,7 +462,9 @@ def eval_motion_displacement(
                 curr_mask = np.logical_and(curr_mask, roi_mask)
 
                 cell_idx = np.where(curr_mask == True)
-
+                
+                if general_flag:
+                    all_disp_field_gt = all_disp_field_gt * cat_nongeneral_map
                 gt = all_disp_field_gt[:, s]
                 pred = disp_pred[:, s]
                 norm_error = np.linalg.norm(gt - pred, ord=2, axis=1)
@@ -262,8 +501,8 @@ def eval_motion_displacement(
 
         overall_cls_gt.append(pixel_cat_map_numpy[idx_fg])
         overall_cls_pred.append(class_pred_numpy[idx_fg])
-
-        print("Finish sample [{}/{}]".format(i + 1, int(np.ceil(len(dataset) / float(batch_size)))))
+        if (i+1) % 100 == 0:
+            print("Finish sample [{}/{}]".format(i + 1, int(np.ceil(len(dataset) / float(batch_size)))))
 
     # Compute the statistics
     dump_res = []
@@ -317,9 +556,20 @@ def eval_motion_displacement(
     # Compute the mean classification accuracy for each object category
     overall_cls_gt = np.concatenate(overall_cls_gt)
     overall_cls_pred = np.concatenate(overall_cls_pred)
+
     cm = confusion_matrix(overall_cls_gt, overall_cls_pred)
     cm_sum = np.sum(cm, axis=1)
-    mean_cat = cm[np.arange(5), np.arange(5)] / cm_sum
+    cls_num = len(np.unique(overall_cls_gt))
+    # try:
+    #     print("The number of cls pred:{}".format(len(np.unique(overall_cls_pred))))
+    #     mean_cat = cm[np.arange(cls_num), np.arange(cls_num)] / cm_sum
+        
+    # except:
+        # cls_num = np.min([len(np.unique(overall_cls_gt)), len(np.unique(overall_cls_pred))])
+    cls_num = cm.shape[0]
+    # breakpoint()
+    mean_cat = cm[np.arange(cls_num), np.arange(cls_num)] / cm_sum
+    # breakpoint()
     cat_map = {0: "Bg", 1: "Vehicle", 2: "Ped", 3: "Bike", 4: "Others"}
     for i in range(len(mean_cat)):
         print("mean cat accuracy of {}: {}".format(cat_map[i], mean_cat[i]))
@@ -348,10 +598,26 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--net", default="MotionNet", type=str, help="Which network [MotionNet/MotionNetMGDA]")
     parser.add_argument("-a", "--adj", action="store_false", help="Whether predict the relative offset between frames")
     parser.add_argument("-j", "--jitter", action="store_false", help="Whether to apply jitter suppression")
+    parser.add_argument('--gpu', default='0', type=str, help='use gpu id')
+    parser.add_argument('-g','--general', action='store_true', help='Whether to apply general')
+    parser.add_argument('--noise', action='store_true', help='Whether to apply noise suppression')
+    parser.add_argument('--noise_factor', default=0.1, type=float, help='The noise factor')
 
+    parser.add_argument('--sensor_type', default='nuscenes', type=str, help='The dataset')
+    parser.add_argument('--use_v', action='store_true', help='whether to apply velocity')
+    parser.add_argument('--use_vdir', action='store_true', help='whether to apply velocity direction')
+    parser.add_argument('--debug', action='store_true', help='Switch to debug mode')
     args = parser.parse_args()
     print(args)
 
+    if args.sensor_type == 'wt128_0' or args.sensor_type == 'at128_0':
+        out_seq_len = 10
+    else:
+        out_seq_len = 20
+
+    area_extents = np.array([[-32., 32.], [-32., 32.], [-3., 2.]])
+    if args.sensor_type == 'wt128_0':
+        area_extents = np.array([[0., 64.], [-32., 32.], [-2., 3.]])
     eval_motion_displacement(
         model_path=args.model,
         save_eval_file_path=args.log,
@@ -362,11 +628,14 @@ if __name__ == "__main__":
         num_workers=args.worker,
         voxel_size=(0.25, 0.25, 0.4),
         # area_extents=np.array([[-32.0, 32.0], [-32.0, 32.0], [-3.0, 2.0]]),
-        area_extents=np.array([[0., 64.], [-16., 16], [0., 5.]]),
+        area_extents=area_extents,
         future_frame_skip=0,
-        num_future_sweeps=20,
+        num_future_sweeps=out_seq_len,
         use_adj_frame_pred=args.adj,
         use_motion_state_pred_masking=args.jitter,
         height_feat_size=13,
         num_obj_category=5,
+        general_flag=args.general,
+        sensor_type=args.sensor_type,
+        args=args,
     )

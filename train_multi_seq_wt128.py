@@ -15,8 +15,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from data.nuscenes_dataloader import TrainDatasetMultiSeq, DatasetSingleSeq
-from model.model import MotionNet, GeneralMotionNet
-# from model.be_sti import MotionNet, GeneralMotionNet
+from model.model import MotionNet, GeneralMotionNet, LowerGeneralMotionNet
+# model: BE-STI
+from model.be_sti import MotionNet as besti
+from model.be_sti import GeneralMotionNet as Generalbesti
 
 
 class AverageMeter(object):
@@ -78,7 +80,13 @@ parser.add_argument("--nworker", default=4, type=int, help="Number of workers")
 
 parser.add_argument("--lr", default=0.0032, type=float, help="The model learning rate")
 
+parser.add_argument("--model", default="GeneralMotionNet", type=str, help="The model name")
+parser.add_argument("--backbone", default="MotionNet", type=str, help="The backbone name:[be-sti,MotionNet]")
+
 parser.add_argument("--use_v", action="store_true", help="Whether to use prior velocity")
+parser.add_argument("--use_vdir", action="store_true", help="Whether to use prior velocity direction")
+parser.add_argument("--input_frames", default=5, type=int, help="The number of input frames")
+
 parser.add_argument(
     "--reg_weight_bg_tc", default=0.1, type=float, help="Weight of background temporal consistency term"
 )
@@ -93,6 +101,8 @@ parser.add_argument("--nn_sampling", action="store_true", help="Whether to use n
 parser.add_argument("--log", action="store_true", help="Whether to log")
 parser.add_argument("--logpath", default="", help="The path to the output log file")
 parser.add_argument("--gpu", default="4")
+parser.add_argument('--general', action='store_true', help='Whether to mask non general')
+parser.add_argument("--debug", action="store_true", help="Whether to debug")
 args = parser.parse_args()
 print(args)
 
@@ -111,7 +121,7 @@ use_fg_temporal_consistency = args.use_fg_tc
 use_spatial_consistency = args.use_sc
 
 use_nn_sampling = args.nn_sampling
-
+get_general = args.general
 voxel_size = (0.25, 0.25, 0.4)
 # area_extents = np.array([[-32.0, 32.0], [-32.0, 32.0], [-3.0, 2.0]])
 # area_extents = np.array([[0, 64.0], [-32.0, 32.0], [0, 5.0]])
@@ -177,8 +187,10 @@ def main():
         voxel_size=voxel_size,
         area_extents=area_extents,
         num_category=cell_category_num,
+        num_past_frames=args.input_frames,
         num_future_frames=out_seq_len,
-        sensor_type="wt128_0"
+        sensor_type="wt128_0",
+        debug_mode=args.debug
     )
 
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=BATCH_SIZE, shuffle=True, num_workers=num_workers)
@@ -190,14 +202,35 @@ def main():
     evalset = DatasetSingleSeq(dataset_root = args.evaldata, split=evalset_split, future_frame_skip=0,
                                 use_velocity_flag=velocity_flag,
                                 voxel_size=voxel_size, area_extents=area_extents, num_category=cell_category_num,
-                                sensor_type='wt128_0')
+                                num_past_frames=args.input_frames,
+                                num_future_frames=out_seq_len,
+                                sensor_type='wt128_0',
+                                debug_mode=args.debug)
 
     evalloader = torch.utils.data.DataLoader(evalset, batch_size=1, shuffle=False, num_workers=num_workers)
-
-    if args.use_v:
-        model = GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
-    else:
-        model = MotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+    if args.model == "GeneralMotionNet":
+        if args.use_v and args.use_vdir:
+            if args.backbone == 'MotionNet':
+                model = GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+            elif args.backbone == 'be-sti':
+                model = Generalbesti(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+        elif args.use_v and not args.use_vdir:
+            if args.backbone == 'MotionNet':
+                model = GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+            elif args.backbone == 'be-sti':
+                model = Generalbesti(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+        else:
+            if args.backbone == 'MotionNet':
+                model = MotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+            elif args.backbone == 'be-sti':
+                model = besti(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+    elif args.model == "LowerGeneralMotionNet":
+        if args.use_v and args.use_vdir:
+            model = LowerGeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+        elif args.use_v and not args.use_vdir:
+            model = LowerGeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+        else:
+            model = LowerGeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
     
     model = nn.DataParallel(model)
     model = model.to(device)
@@ -210,7 +243,9 @@ def main():
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 20, 30, 40], gamma=0.5)
 
     if args.resume != "":
-        checkpoint = torch.load(args.resume)
+        # checkpoint = torch.load(args.resume)
+        model_path = f"{args.resume}/latest.pth"
+        checkpoint = torch.load(model_path)
         start_epoch = checkpoint["epoch"] + 1
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
@@ -218,6 +253,9 @@ def main():
 
         print("Load model from {}, at epoch {}".format(args.resume, start_epoch - 1))
 
+    # init eval metric
+    me_static, me_slow, me_fast, pixel_acc = 1e3, 1e3, 1e3, 1e3
+    best_metric = me_static + me_fast
     for epoch in range(start_epoch, num_epochs + 1):
         lr = optimizer.param_groups[0]["lr"]
         print("Epoch {}, learning rate {}".format(epoch, lr))
@@ -236,20 +274,36 @@ def main():
         # eval the model
         model.eval()
         # TODO: eval function
-        me_static, me_slow, me_fast, pixel_acc = \
+        
+        me_static, me_slow, me_fast, quantile_50_static, quantile_50_slow, quantile_50_fast, pixel_acc = \
             eval_motion_displacement(model=model, dataloader=evalloader, dataset=evalset, device=device, \
                                     num_future_sweeps=10)
         # me_static, me_slow, me_fast, pixel_acc = 0,0,0,0
+        
         if need_log:
             saver.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(loss_disp, loss_class, loss_motion, loss_bg_tc,
                                                           loss_fg_tc, loss_sc))
             saver.write("me_static: {}\t me_slow: {}\t me_fast: {}\n".format(me_static, me_slow, me_fast))
+            saver.write("quantile_50_static: {}\t quantile_50_slow: {}\t quantile_50_fast: {}\n".format(quantile_50_static, quantile_50_slow, quantile_50_fast))
             saver.write("pixel acc: {}\n".format(pixel_acc))
             saver.flush()
 
         # save model
+        """save the best models"""
+        new_metric = me_static + me_fast
+        if new_metric < best_metric:
+            best_metric = new_metric
+            if need_log:
+                save_dict = {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": scheduler.state_dict(),
+                "loss": loss_disp.avg,
+            }
+            torch.save(save_dict, os.path.join(model_save_path, "save_model.pth"))
         # if need_log and (epoch % 5 == 0 or epoch == num_epochs or epoch == 1 or epoch > 45):
-        if need_log and (epoch % 20 == 0 or epoch == 1):
+        if need_log and (epoch % 5 == 0 or epoch == 1):
             save_dict = {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
@@ -299,8 +353,10 @@ def train(model, criterion, trainloader, optimizer, device, epoch):
 
 
         # Make prediction
-        if args.use_v:
-            disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps)
+        if args.use_v and args.use_vdir:
+            disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps, all_pixel_direction_maps)
+        elif args.use_v and not args.use_vdir:
+            disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps) 
         else:
             disp_pred, class_pred, motion_pred = model(padded_voxel_points) 
 
@@ -336,18 +392,19 @@ def train(model, criterion, trainloader, optimizer, device, epoch):
         running_loss_disp.update(loss_disp)
         running_loss_class.update(loss_class)
         running_loss_motion.update(loss_motion)
-        print(
-            "[{}/{}]\t{}, \t{}, \t{}, \t{}, \t{}, \t{}".format(
-                epoch,
-                i,
-                running_loss_disp,
-                running_loss_class,
-                running_loss_motion,
-                running_loss_bg_tc,
-                running_loss_sc,
-                running_loss_fg_tc,
+        if (i+1) % 100 == 0:
+            print(
+                "[{}/{}]\t{}, \t{}, \t{}, \t{}, \t{}, \t{}".format(
+                    epoch,
+                    i,
+                    running_loss_disp,
+                    running_loss_class,
+                    running_loss_motion,
+                    running_loss_bg_tc,
+                    running_loss_sc,
+                    running_loss_fg_tc,
+                )
             )
-        )
 
     return (
         running_loss_disp,
@@ -398,7 +455,7 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
 
     for i, data in enumerate(dataloader, 0):
         padded_voxel_points, all_disp_field_gt, all_valid_pixel_maps, \
-            non_empty_map, pixel_cat_map_gt, past_steps, future_steps, motion_gt, \
+            non_empty_map, pixel_cat_map_gt, pixel_instance_map_gt, past_steps, future_steps, motion_gt, \
             all_pixel_velocity_maps, all_pixel_direction_maps, all_pixel_cos_maps = data
 
         padded_voxel_points = padded_voxel_points.to(device)
@@ -422,10 +479,12 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
             cat_nongeneral_map[pixel_cat_map_numpy == 5] = 1
 
         with torch.no_grad():
-            if args.use_v:
-                disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps)
+            if args.use_v and args.use_vdir:
+                disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps, all_pixel_direction_maps)
+            elif args.use_v and not args.use_vdir:
+                disp_pred, class_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps) 
             else:
-                disp_pred, class_pred, motion_pred = model(padded_voxel_points)
+                disp_pred, class_pred, motion_pred = model(padded_voxel_points) 
             
 
             pred_shape = disp_pred.size()
@@ -552,14 +611,15 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
 
         overall_cls_gt.append(pixel_cat_map_numpy[idx_fg])
         overall_cls_pred.append(class_pred_numpy[idx_fg])
-
-        print("Finish sample [{}/{}]".format(i + 1, int(np.ceil(len(dataset) / float(batch_size)))))
+        if (i + 1) % 100 == 0:
+            print("Finish sample [{}/{}]".format(i + 1, int(np.ceil(len(dataset) / float(batch_size)))))
 
     # Compute the statistics
     dump_res = []
 
     # Compute the statistics of displacement prediction error
     me_list = np.zeros([3])
+    quantile_50 = np.zeros([3])
     for i, d in enumerate(speed_intervals):
         group = cell_groups[i]
         print("--------------------------------------------------------------")
@@ -590,6 +650,7 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
                 format(selected_future_sweeps[s], mean_error, error_quantile_50)
             print(msg)
         me_list[i] = mean_error
+        quantile_50[i] = error_quantile_50
         print("--------------------------------------------------------------\n")
         # if save_eval_file_path is not None:
         #     saver.write("--------------------------------------------------------------\n\n")
@@ -610,19 +671,21 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
 
     cell_cls_num = len(np.unique(overall_cls_gt))
     cell_cls_num1 = len(np.unique(overall_cls_pred))
+    cls_num = cm.shape[0]
     # breakpoint()
     print("cls_num: {} / {}".format(cell_cls_num, cell_cls_num1))
-    # mean_cat = cm[np.arange(cell_cls_num), np.arange(cell_cls_num)] / cm_sum
-    # cat_map = {0: 'Bg', 1: 'Vehicle', 2: 'Ped', 3: 'Bike', 4: 'Others'}
-    # for i in range(len(mean_cat)):
-    #     print("mean cat accuracy of {}: {}".format(cat_map[i], mean_cat[i]))
-    # print("mean instance acc: ", np.mean(mean_cat))
+    mean_cat = cm[np.arange(cls_num), np.arange(cls_num)] / cm_sum
+    cat_map = {0: 'Bg', 1: 'Vehicle', 2: 'Ped', 3: 'Bike', 4: 'Others'}
+    for i in range(len(mean_cat)):
+        print("mean cat accuracy of {}: {}".format(cat_map[i], mean_cat[i]))
+    print("mean instance acc: ", np.mean(mean_cat))
     if save_eval_file_path is not None:
         for i in range(len(mean_cat)):
             saver.write("mean cat accuracy of {}: {}\n".format(cat_map[i], mean_cat[i]))
         saver.write("mean instance acc: {}\n".format(np.mean(mean_cat)))
 
-    return me_list[0], me_list[1], me_list[2], pixel_acc
+    return me_list[0], me_list[1], me_list[2], quantile_50[0], quantile_50[1], quantile_50[2], \
+            pixel_acc
 
 # Compute and back-propagate the loss
 def compute_and_bp_loss(
@@ -689,10 +752,25 @@ def compute_and_bp_loss(
         pixel_cat_map_gt_numpy = pixel_cat_map_gt.numpy()
         pixel_cat_map_gt_numpy = np.argmax(pixel_cat_map_gt_numpy, axis=-1) + 1
         cat_weight_map = np.zeros_like(pixel_cat_map_gt_numpy, dtype=np.float32)
+        cat_weight_map_cls = cat_weight_map
         weight_vector = [0.005, 1.0, 1.0, 1.0, 1.0]  # [bg, car & bus, ped, bike, other]
+        # for k in range(len(weight_vector)):
+        #     mask = pixel_cat_map_gt_numpy == (k + 1)
+        #     cat_weight_map[mask] = weight_vector[k]
+        if get_general:
+            curr_annotated_point_num = np.sum( (pixel_cat_map_gt_numpy != 5) & (pixel_cat_map_gt_numpy != 0) )
+            valid_pixel_num = curr_annotated_point_num
+            weight_vector_general = [0.005, 1.0, 1.0, 1.0, 0.0]
+
         for k in range(len(weight_vector)):
             mask = pixel_cat_map_gt_numpy == (k + 1)
-            cat_weight_map[mask] = weight_vector[k]
+            if get_general:
+               cat_weight_map[mask] = weight_vector_general[k]
+               cat_weight_map_cls[mask] = weight_vector[k]
+            
+            else:
+                cat_weight_map[mask] = weight_vector[k]
+                cat_weight_map_cls[mask] = weight_vector[k]
 
         cat_weight_map = cat_weight_map[:, np.newaxis, np.newaxis, ...]  # (batch, 1, 1, h, w)
         cat_weight_map = torch.from_numpy(cat_weight_map).to(device)

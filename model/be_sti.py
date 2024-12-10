@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from typing import List
-
+from model.vae_model import SimpleVAE
 
 class Conv3D(nn.Module):
     def __init__(self, in_channel, out_channel, kernel_size, stride, padding):
@@ -429,6 +429,133 @@ class MixGeneralMotionNet(nn.Module):
         disp = disp.view(-1, 2, x.size(-2), x.size(-1))
 
         return disp, cell_class_pred, state_class_pred
+
+class be_stiVAE(nn.Module):
+    def __init__(self, out_seq_len=20, motion_category_num=2, height_feat_size=13):
+        super(be_stiVAE, self).__init__()
+        self.out_seq_len = out_seq_len
+
+        self.stpn = STPN(height_feat_size=height_feat_size)
+        self.cell_classify = CellClassification()
+        self.motion_pred = MotionPrediction(seq_len=self.out_seq_len)
+        self.state_classify = StateEstimation(motion_category_num=motion_category_num)
+
+        self.present_distrubution = SimpleVAE(in_channels=32, latent_dim=32, hidden_dims=[32, 64, 128, 256, 512], 
+                                    bev_size=256)
+
+        self.future_distrubution = SimpleVAE(in_channels=32+5+2*out_seq_len+2, latent_dim=32, hidden_dims=[32, 64, 128, 256, 512], 
+                          bev_size=256)
+        self.conv_fuser = ConvFuser(in_channels=[32, 32], out_channels=32)
+    def forward(self, bevs, gt_map=None):
+        bevs = bevs.permute(0, 1, 4, 2, 3)  # (Batch, seq, z, h, w)
+
+        # Backbone network
+        x = self.stpn(bevs)
+ 
+
+        # present_mu = self.present_distrubution(x)[-3]
+        # present_log_sigma = self.present_distrubution(x)[-2]
+        
+        bev_refine, _, present_mu, present_log_sigma, _ = self.present_distrubution(x)
+
+        # x_detach = x.detach()
+        bev_gt_refine, vae_dict = None, None
+        if gt_map is not None:
+            
+            con_x = torch.cat([x, gt_map], dim=1)
+            bev_gt_refine, _, future_mu, future_log_sigma, _ = self.future_distrubution(con_x)
+
+            vae_dict = {
+                'present_mu': present_mu,
+                'present_log_sigma': present_log_sigma,
+                'future_mu': future_mu,
+                'future_log_sigma': future_log_sigma,
+            }
+
+            # bev_gt_refine = self.future_distrubution(con_x)[0]
+        if bev_gt_refine is not None:
+            bev_refine = bev_gt_refine
+        bev_refine = bev_refine + x
+        # bev_refine = self.conv_fuser([x, bev_refine])
+        # TODO: res connection
+        """bev_refine=x + bev_refine"""
+        # Cell Classification head
+        cell_class_pred = self.cell_classify(bev_refine)
+
+        # Motion State Classification head
+        state_class_pred = self.state_classify(bev_refine)
+        # Motion Displacement prediction
+        disp = self.motion_pred(bev_refine)
+        disp = disp.view(-1, 2, x.size(-2), x.size(-1)) 
+
+        return disp, cell_class_pred, state_class_pred, vae_dict
+
+# class VAE_Generalbe_sti(nn.Module):
+class VAE_Generalbe_sti(nn.Module):
+    def __init__(self, out_seq_len:int=20, motion_category_num=2, height_feat_size=13, \
+                ):
+        super(VAE_Generalbe_sti, self).__init__()
+        self.out_seq_len = out_seq_len
+
+        self.cell_classify = CellClassification()
+        self.motion_pred = MotionPrediction(seq_len=self.out_seq_len)
+        self.state_classify = StateEstimation(motion_category_num=motion_category_num)
+        self.stpn = STPN(height_feat_size=height_feat_size)
+        self.present_distrubution = SimpleVAE(in_channels=32, latent_dim=32, hidden_dims=[32, 64, 128, 256, 512], 
+                                    bev_size=256)
+
+        self.future_distrubution = SimpleVAE(in_channels=32+5+2*out_seq_len+2, latent_dim=32, hidden_dims=[32, 64, 128, 256, 512], 
+                          bev_size=256)
+        self.conv_fuser = ConvFuser(in_channels=[32, 32], out_channels=32)
+
+    def forward(self, bevs, gt_map=None, prior_velocity=None, prior_direction=None):
+        
+        bevs = bevs.permute(0, 1, 4, 2, 3)  # (Batch, seq, z, h, w)
+
+        if prior_velocity is not None:
+            prior_velocity = prior_velocity.permute(0, 1, 4, 2, 3)
+            bevs = torch.cat([bevs, prior_velocity], dim=2)
+        if prior_direction is not None:
+            prior_direction = prior_direction.permute(0, 1, 4, 2, 3)
+            bevs = torch.cat([bevs, prior_direction], dim=2)
+        # Backbone network
+        x = self.stpn(bevs)
+
+        bev_refine, _, present_mu, present_log_sigma, _ = self.present_distrubution(x)
+
+        # x_detach = x.detach()
+        bev_gt_refine, vae_dict = None, None
+        if gt_map is not None:
+            
+            con_x = torch.cat([x, gt_map], dim=1)
+            bev_gt_refine, _, future_mu, future_log_sigma, _ = self.future_distrubution(con_x)
+
+            vae_dict = {
+                'present_mu': present_mu,
+                'present_log_sigma': present_log_sigma,
+                'future_mu': future_mu,
+                'future_log_sigma': future_log_sigma,
+            }
+
+            # bev_gt_refine = self.future_distrubution(con_x)[0]
+        if bev_gt_refine is not None:
+            bev_refine = bev_gt_refine
+        bev_refine = bev_refine + x
+        # bev_refine = self.conv_fuser([x, bev_refine])
+        # TODO: res connection
+        """bev_refine=x + bev_refine"""
+
+        # Cell Classification head
+        cell_class_pred = self.cell_classify(bev_refine)
+
+        # Motion State Classification head
+        state_class_pred = self.state_classify(bev_refine)
+
+        # Motion Displacement prediction
+        disp = self.motion_pred(bev_refine)
+        disp = disp.view(-1, 2, x.size(-2), x.size(-1))
+
+        return disp, cell_class_pred, state_class_pred, vae_dict
 
 # For MGDA loss computation
 class FeatEncoder(nn.Module):

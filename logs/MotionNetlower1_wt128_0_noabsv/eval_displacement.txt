@@ -1,0 +1,363 @@
+--------------------------------------------------------------
+speed_stability_value:0.14686383306980133gt stability value:0.0008460136014036834--------------------------------------------------------------
+For cells within speed range [0.0, 0.0]:
+
+Frame 1 in spatial range [0, 10]:
+The mean error is 0.002865383168682456
+The 50% error quantile is 0.0
+Frame 1 in spatial range [10, 20]:
+The mean error is 0.0017326581291854382
+The 50% error quantile is 0.0
+Frame 1 in spatial range [20, 100]:
+The mean error is 0.009333329275250435
+The 50% error quantile is 0.0
+Frame 2 in spatial range [0, 10]:
+The mean error is 0.005533886607736349
+The 50% error quantile is 0.0
+Frame 2 in spatial range [10, 20]:
+The mean error is 0.0033830509055405855
+The 50% error quantile is 0.0
+Frame 2 in spatial range [20, 100]:
+The mean error is 0.018450139090418816
+The 50% error quantile is 0.0
+Frame 3 in spatial range [0, 10]:
+The mean error is 0.007990076206624508
+The 50% error quantile is 0.0
+Frame 3 in spatial range [10, 20]:
+The mean error is 0.004988414701074362
+The 50% error quantile is 0.0
+Frame 3 in spatial range [20, 100]:
+The mean error is 0.02734753116965294
+The 50% error quantile is 0.0
+Frame 4 in spatial range [0, 10]:
+The mean error is 0.010403948836028576
+The 50% error quantile is 0.0
+Frame 4 in spatial range [10, 20]:
+The mean error is 0.006634765304625034
+The 50% error quantile is 0.0
+Frame 4 in spatial range [20, 100]:
+The mean error is 0.03619435802102089
+The 50% error quantile is 0.0
+Frame 5 in spatial range [0, 10]:
+The mean error is 0.012548387981951237
+The 50% error quantile is 0.0
+Frame 5 in spatial range [10, 20]:
+The mean error is 0.00828293152153492
+The 50% error quantile is 0.0
+Frame 5 in spatial range [20, 100]:
+The mean error is 0.04518590122461319
+The 50% error quantile is 0.0
+Frame 6 in spatial range [0, 10]:
+The mean error is 0.0148253683000803
+The 50% error quantile is 0.0
+Frame 6 in spatial range [10, 20]:
+The mean error is 0.00992990005761385
+The 50% error quantile is 0.0
+Frame 6 in spatial range [20, 100]:
+The mean error is 0.054016415029764175
+The 50% error quantile is 0.0
+Frame 7 in spatial range [0, 10]:
+The mean error is 0.016558391973376274
+The 50% error quantile is 0.0
+Frame 7 in spatial range [10, 20]:
+The mean error is 0.011531822383403778
+The 50% error quantile is 0.0
+Frame 7 in spatial range [20, 100]:
+The mean error is 0.06296584755182266
+The 50% error quantile is 0.0
+Frame 8 in spatial range [0, 10]:
+The mean error is 0.018330048769712448
+The 50% error quantile is 0.0
+Frame 8 in spatial range [10, 20]:
+The mean error is 0.01315629854798317
+The 50% error quantile is 0.0
+Frame 8 in spatial range [20, 100]:
+The mean error is 0.07193811982870102
+The 50% error quantile is 0.0
+Frame 9 in spatial range [0, 10]:
+The mean error is 0.018781369552016258
+The 50% error quantile is 0.0
+Frame 9 in spatial range [10, 20]:
+The mean error is 0.014762578532099724
+The 50% error quantile is 0.0
+Frame 9 in spatial range [20, 100]:
+The mean error is 0.0810069739818573
+The 50% error quantile is 0.0
+Frame 10 in spatial range [0, 10]:
+The mean error is 0.018954578787088394
+The 50% error quantile is 0.0
+Frame 10 in spatial range [10, 20]:
+The mean error is 0.016284717246890068
+The 50% error quantile is 0.0
+Frame 10 in spatial range [20, 100]:
+The mean error is 0.08987894654273987
+The 50% error quantile is 0.0
+--------------------------------------------------------------
+
+--------------------------------------------------------------
+For cells within speed range [0.0, 5.0]:
+
+Frame 1 in spatial range [0, 10]:
+The mean error is 0.16959117352962494
+The 50% error quantile is 0.09054044634103775
+Frame 1 in spatial range [10, 20]:
+The mean error is 0.18568983674049377
+The 50% error quantile is 0.09724554046988487
+Frame 1 in spatial range [20, 100]:
+The mean error is 0.2277384102344513
+The 50% error quantile is 0.1222362369298935
+Frame 2 in spatial range [0, 10]:
+The mean error is 0.3081241846084595
+The 50% error quantile is 0.1409769356250763
+Frame 2 in spatial range [10, 20]:
+The mean error is 0.3343687653541565
+The 50% error quantile is 0.1587730273604393
+Frame 2 in spatial range [20, 100]:
+The mean error is 0.4003980755805969
+The 50% error quantile is 0.20645205676555634
+Frame 3 in spatial range [0, 10]:
+The mean error is 0.42677250504493713
+The 50% error quantile is 0.16199705004692078
+Frame 3 in spatial range [10, 20]:
+The mean error is 0.463280588388443
+The 50% error quantile is 0.19972658902406693
+Frame 3 in spatial range [20, 100]:
+The mean error is 0.5508238077163696
+The 50% error quantile is 0.273779958486557
+Frame 4 in spatial range [0, 10]:
+The mean error is 0.5320007801055908
+The 50% error quantile is 0.18830368667840958
+Frame 4 in spatial range [10, 20]:
+The mean error is 0.5798842310905457
+The 50% error quantile is 0.23053403198719025
+Frame 4 in spatial range [20, 100]:
+The mean error is 0.6870889067649841
+The 50% error quantile is 0.3328154981136322
+Frame 5 in spatial range [0, 10]:
+The mean error is 0.613635241985321
+The 50% error quantile is 0.20827611535787582
+Frame 5 in spatial range [10, 20]:
+The mean error is 0.692552387714386
+The 50% error quantile is 0.2681267261505127
+Frame 5 in spatial range [20, 100]:
+The mean error is 0.814380943775177
+The 50% error quantile is 0.3852144926786423
+Frame 6 in spatial range [0, 10]:
+The mean error is 0.6460290551185608
+The 50% error quantile is 0.2055240273475647
+Frame 6 in spatial range [10, 20]:
+The mean error is 0.7928107976913452
+The 50% error quantile is 0.29676926136016846
+Frame 6 in spatial range [20, 100]:
+The mean error is 0.9371445178985596
+The 50% error quantile is 0.4364362061023712
+Frame 7 in spatial range [0, 10]:
+The mean error is 0.6455727815628052
+The 50% error quantile is 0.2226489782333374
+Frame 7 in spatial range [10, 20]:
+The mean error is 0.8705416917800903
+The 50% error quantile is 0.3272666782140732
+Frame 7 in spatial range [20, 100]:
+The mean error is 1.0535566806793213
+The 50% error quantile is 0.47723010182380676
+Frame 8 in spatial range [0, 10]:
+The mean error is 0.5989928245544434
+The 50% error quantile is 0.24238985031843185
+Frame 8 in spatial range [10, 20]:
+The mean error is 0.92436283826828
+The 50% error quantile is 0.33759312331676483
+Frame 8 in spatial range [20, 100]:
+The mean error is 1.1633708477020264
+The 50% error quantile is 0.5198067128658295
+Frame 9 in spatial range [0, 10]:
+The mean error is 0.48495611548423767
+The 50% error quantile is 0.2666652798652649
+Frame 9 in spatial range [10, 20]:
+The mean error is 0.940234363079071
+The 50% error quantile is 0.37134477496147156
+Frame 9 in spatial range [20, 100]:
+The mean error is 1.2547448873519897
+The 50% error quantile is 0.5623451471328735
+Frame 10 in spatial range [0, 10]:
+The mean error is 0.31851014494895935
+The 50% error quantile is 0.2740757465362549
+Frame 10 in spatial range [10, 20]:
+The mean error is 0.9140223860740662
+The 50% error quantile is 0.4039354771375656
+Frame 10 in spatial range [20, 100]:
+The mean error is 1.3222931623458862
+The 50% error quantile is 0.5912023186683655
+--------------------------------------------------------------
+
+--------------------------------------------------------------
+For cells within speed range [5.0, 20.0]:
+
+Frame 1 in spatial range [0, 10]:
+The mean error is 0.7852774858474731
+The 50% error quantile is 0.8160693943500519
+Frame 1 in spatial range [10, 20]:
+The mean error is 0.7447845935821533
+The 50% error quantile is 0.6350053548812866
+Frame 1 in spatial range [20, 100]:
+The mean error is 0.28437477350234985
+The 50% error quantile is 0.17522673308849335
+Frame 2 in spatial range [0, 10]:
+The mean error is 1.5680228471755981
+The 50% error quantile is 1.6708541512489319
+Frame 2 in spatial range [10, 20]:
+The mean error is 1.4779976606369019
+The 50% error quantile is 1.2878365516662598
+Frame 2 in spatial range [20, 100]:
+The mean error is 0.5423905253410339
+The 50% error quantile is 0.3134009838104248
+Frame 3 in spatial range [0, 10]:
+The mean error is 2.3426501750946045
+The 50% error quantile is 2.5231722593307495
+Frame 3 in spatial range [10, 20]:
+The mean error is 2.2075531482696533
+The 50% error quantile is 1.9348424673080444
+Frame 3 in spatial range [20, 100]:
+The mean error is 0.802476167678833
+The 50% error quantile is 0.45057065784931183
+Frame 4 in spatial range [0, 10]:
+The mean error is 3.118435859680176
+The 50% error quantile is 3.398959159851074
+Frame 4 in spatial range [10, 20]:
+The mean error is 2.9437355995178223
+The 50% error quantile is 2.5414328575134277
+Frame 4 in spatial range [20, 100]:
+The mean error is 1.0664782524108887
+The 50% error quantile is 0.5972998440265656
+Frame 5 in spatial range [0, 10]:
+The mean error is 3.8883602619171143
+The 50% error quantile is 4.250889301300049
+Frame 5 in spatial range [10, 20]:
+The mean error is 3.6811676025390625
+The 50% error quantile is 3.1782469749450684
+Frame 5 in spatial range [20, 100]:
+The mean error is 1.329128623008728
+The 50% error quantile is 0.7450011670589447
+Frame 6 in spatial range [0, 10]:
+The mean error is 4.66198205947876
+The 50% error quantile is 5.1057164669036865
+Frame 6 in spatial range [10, 20]:
+The mean error is 4.411581039428711
+The 50% error quantile is 3.8149577379226685
+Frame 6 in spatial range [20, 100]:
+The mean error is 1.5916173458099365
+The 50% error quantile is 0.8918849229812622
+Frame 7 in spatial range [0, 10]:
+The mean error is 5.4371113777160645
+The 50% error quantile is 5.967907905578613
+Frame 7 in spatial range [10, 20]:
+The mean error is 5.1371355056762695
+The 50% error quantile is 4.473546504974365
+Frame 7 in spatial range [20, 100]:
+The mean error is 1.8545379638671875
+The 50% error quantile is 1.033297061920166
+Frame 8 in spatial range [0, 10]:
+The mean error is 6.212061882019043
+The 50% error quantile is 6.829940319061279
+Frame 8 in spatial range [10, 20]:
+The mean error is 5.8671979904174805
+The 50% error quantile is 5.12017560005188
+Frame 8 in spatial range [20, 100]:
+The mean error is 2.1207563877105713
+The 50% error quantile is 1.1839758157730103
+Frame 9 in spatial range [0, 10]:
+The mean error is 6.991302013397217
+The 50% error quantile is 7.704742670059204
+Frame 9 in spatial range [10, 20]:
+The mean error is 6.590301990509033
+The 50% error quantile is 5.6597771644592285
+Frame 9 in spatial range [20, 100]:
+The mean error is 2.38946270942688
+The 50% error quantile is 1.337908148765564
+Frame 10 in spatial range [0, 10]:
+The mean error is 7.775169849395752
+The 50% error quantile is 8.576240062713623
+Frame 10 in spatial range [10, 20]:
+The mean error is 7.310226917266846
+The 50% error quantile is 6.244725227355957
+Frame 10 in spatial range [20, 100]:
+The mean error is 2.6665291786193848
+The 50% error quantile is 1.4999817609786987
+--------------------------------------------------------------
+
+Mean pixel classification accuracy: 0.9545571210896542
+mean cat accuracy of Bg: 0.9669472763955576
+mean cat accuracy of Vehicle: 0.9588459954277069
+mean cat accuracy of Ped: 0.8704995813564053
+mean cat accuracy of Bike: 0.8606246098356107
+mean instance acc: 0.9142293657538201
+
+Reshape the displacement prediction statistics into a column:
+[0.00286538 0.00173266 0.00933333]
+[0.00553389 0.00338305 0.01845014]
+[0.00799008 0.00498841 0.02734753]
+[0.01040395 0.00663477 0.03619436]
+[0.01254839 0.00828293 0.0451859 ]
+[0.01482537 0.0099299  0.05401642]
+[0.01655839 0.01153182 0.06296585]
+[0.01833005 0.0131563  0.07193812]
+[0.01878137 0.01476258 0.08100697]
+[0.01895458 0.01628472 0.08987895]
+[0. 0. 0.]
+[0. 0. 0.]
+[0. 0. 0.]
+[0. 0. 0.]
+[0. 0. 0.]
+[0. 0. 0.]
+[0. 0. 0.]
+[0. 0. 0.]
+[0. 0. 0.]
+[0. 0. 0.]
+[0.16959117 0.18568984 0.22773841]
+[0.30812418 0.33436877 0.40039808]
+[0.42677251 0.46328059 0.55082381]
+[0.53200078 0.57988423 0.68708891]
+[0.61363524 0.69255239 0.81438094]
+[0.64602906 0.7928108  0.93714452]
+[0.64557278 0.87054169 1.05355668]
+[0.59899282 0.92436284 1.16337085]
+[0.48495612 0.94023436 1.25474489]
+[0.31851014 0.91402239 1.32229316]
+[0.09054045 0.09724554 0.12223624]
+[0.14097694 0.15877303 0.20645206]
+[0.16199705 0.19972659 0.27377996]
+[0.18830369 0.23053403 0.3328155 ]
+[0.20827612 0.26812673 0.38521449]
+[0.20552403 0.29676926 0.43643621]
+[0.22264898 0.32726668 0.4772301 ]
+[0.24238985 0.33759312 0.51980671]
+[0.26666528 0.37134477 0.56234515]
+[0.27407575 0.40393548 0.59120232]
+[0.78527749 0.74478459 0.28437477]
+[1.56802285 1.47799766 0.54239053]
+[2.34265018 2.20755315 0.80247617]
+[3.11843586 2.9437356  1.06647825]
+[3.88836026 3.6811676  1.32912862]
+[4.66198206 4.41158104 1.59161735]
+[5.43711138 5.13713551 1.85453796]
+[6.21206188 5.86719799 2.12075639]
+[6.99130201 6.59030199 2.38946271]
+[7.77516985 7.31022692 2.66652918]
+[0.81606939 0.63500535 0.17522673]
+[1.67085415 1.28783655 0.31340098]
+[2.52317226 1.93484247 0.45057066]
+[3.39895916 2.54143286 0.59729984]
+[4.2508893  3.17824697 0.74500117]
+[5.10571647 3.81495774 0.89188492]
+[5.96790791 4.4735465  1.03329706]
+[6.82994032 5.1201756  1.18397582]
+[7.70474267 5.65977716 1.33790815]
+[8.57624006 6.24472523 1.49998176]0
+.
+1
+4
+6
+8
+6
+3
+8
+3

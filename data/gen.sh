@@ -11,5 +11,5 @@ echo "save path is : /mnt/personal/qiankangan/$lidar_type/$data_type"
 # --split $data_type --lidartype $lidar_type --savepath /mnt/personal/qiankangan/V0new_$lidar_type/$data_type \
 # --datavision $vision
 OMP_NUM_THREADS=1 python data/gen_Hdata.py  --root /mnt/personal/qiankangan/hadata \
---split $data_type --lidartype $lidar_type --savepath /mnt/personal/qiankangan/all_$lidar_type/$data_type \
+--split $data_type --lidartype $lidar_type --savepath /mnt/personal/qiankangan/all_train240_val30_$lidar_type/$data_type \
 --datavision $vision

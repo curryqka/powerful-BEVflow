@@ -2,13 +2,14 @@ import numpy as np
 from functools import reduce
 from abc import ABC,abstractmethod
 import sys,cv2
-sys.path.insert(0, "/home/qiankangan/MotionNet")
+sys.path.insert(0, "/home/qiankangan/UniGenMotionNet")
+sys.path.insert(0, "/home/qiankangan/haworkspace/hacv")
 from HeTools.Hedata import CustomDataset, CustomDatasetV2
 from HeTools.He_utils import transform_matrix, view_points, transform_corners
 from typing import List, Dict, Tuple, Any
 from pyquaternion import Quaternion
 from scipy.spatial.transform import Rotation as R
-from haplugin.utils.box_utils import boxes_to_corners_3d, corners_3d_to_boxes3d
+# from haplugin.utils.box_utils import boxes_to_corners_3d, corners_3d_to_boxes3d
 class LidarPointCloud(ABC):
     """
     Abstract class for a point cloud.

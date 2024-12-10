@@ -1,32 +1,87 @@
-export PYTHONPATH=/home/qiankangan/MotionNet:$PYTHONPATH
-export PYTHONPATH=/home/qiankangan/MotionNet/nuscenes-devkit/python-sdk:$PYTHONPATH
-OMP_NUM_THREADS=1 python train_multi_seq.py --data /mnt/personal/qiankangan/at128_0/train --evaldata /mnt/personal/qiankangan/at128_0/train \
---batch 32 --nepoch 100 --nworker 2  --log --logpath /home/qiankangan/logs/at128_0v1 --gpu "0" \
---use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 2.0 
+# -*- coding: utf-8 -*-
 
+# 这样也行
+# coding:utf-8 
+# export PYTHONPATH=/home/qiankangan/UniGenMotionNet:$PYTHONPATH
+# export PYTHONPATH=/home/qiankangan/UniGenMotionNet/nuscenes-devkit/python-sdk:$PYTHONPATH
+# sensor_type=$1
+# GPU=$2
+# OMP_NUM_THREADS=1 python train_VAE.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
+# --batch 2 --nepoch 45 --nworker 4 --lr 0.0016 \
+# --use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 15.0 --use_dw \
+# --log --auxiliary --use_adj_frame_pred --model GRUVAE_MotionNet \
+# --logpath /mnt/personal/qiankangan/logs/GRUVAE_bs2_MotionNet --general --gpu $GPU \
+# --sensor_type $sensor_type
 
-OMP_NUM_THREADS=1 python train_multi_seq_wt128.py --data /mnt/personal/qiankangan/wt128_0/train --evaldata /mnt/personal/qiankangan/wt128_0/train \
---batch 32 --nepoch 100 --nworker 2  --log --logpath /home/qiankangan/logs/wt128_0v1 --gpu "5" \
---use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 2.0 
+# origin
+OMP_NUM_THREADS=1 python train_VAE.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
+--batch 4 --nepoch 45 --nworker 4 --lr 0.0016 \
+--use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 15.0 --use_dw \
+--log --auxiliary --use_adj_frame_pred --model GRUVAE_MotionNet \
+--logpath /mnt/personal/qiankangan/logs/GRUVAE_origin_bs4_MotionNet --gpu 4 \
+--sensor_type nuscenes
 
+# uniGen: grid+ins prior + GRU
+OMP_NUM_THREADS=1 python train_VAE.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
+--batch 4 --nepoch 45 --nworker 4 --lr 0.0016 \
+--use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 15.0 --use_dw \
+--log --auxiliary --use_adj_frame_pred --model UniGRUVAE_MotionNet \
+--logpath /mnt/personal/qiankangan/logs/UniGRUVAE_bs4_MotionNet --general --gpu 7 \
+--sensor_type nuscenes --resume /mnt/personal/qiankangan/logs/UniGRUVAE_bs4_MotionNet/train_multi_seq/2024-11-04_22-02-43
 
-OMP_NUM_THREADS=1 python train_multi_seq.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
---batch 32 --nepoch 45 --nworker 2  --log --logpath /home/qiankangan/logs/nuscenes --gpu "3" \
---use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 2.0 
+# Final model
+OMP_NUM_THREADS=1 python train_VAE.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
+--batch 4 --nepoch 45 --nworker 4 --lr 0.0016 \
+--use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 15.0 --use_dw \
+--log --auxiliary --use_adj_frame_pred --model UniGridInsGRUMotionNetVAE \
+--logpath /mnt/personal/qiankangan/logs/UniInsGridGRUVAE_bs4_MotionNet --general --gpu 3 \
+--sensor_type nuscenes
 
-OMP_NUM_THREADS=1 python eval.py --data /mnt/personal/qiankangan/at128_0/train \
---model /home/qiankangan/MotionNet/logs/train_multi_seq/2024-07-31_11-44-04/epoch_300.pth \
---split test --log logs/hetest --bs 1 --net MotionNet
+# ------------ablation-----------------
+#  ablation grid info
+OMP_NUM_THREADS=1 python train_ablation.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
+--batch 4 --nepoch 45 --nworker 4 --lr 0.0016 \
+--use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 15.0 --use_dw \
+--log --auxiliary --use_adj_frame_pred --model UniGridGenMotionNet \
+--logpath /mnt/personal/qiankangan/logs/UniGridGenMotionNet_bs4_ablation --general --gpu 3 \
+--sensor_type nuscenes
 
-OMP_NUM_THREADS=1 python eval.py --data /mnt/personal/qiankangan/val \
---model /home/qiankangan/MotionNet/logs/train_multi_seq/2024-07-31_11-44-04/epoch_300.pth \
---split test --log logs/hetest2 --bs 1 --net MotionNet
+# add feat selection
+OMP_NUM_THREADS=1 python train_ablation.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
+--batch 4 --nepoch 45 --nworker 4 --lr 0.0016 \
+--use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 15.0 --use_dw \
+--log --auxiliary --use_adj_frame_pred --model MulUniGridInsGRUMotionNetVAE \
+--logpath /mnt/personal/qiankangan/logs/MulUniGridInsGRUMotionNetVAE_bs4_ablation --general --gpu 3 \
+--sensor_type nuscenes --grid_prior
 
+# 32x32
+OMP_NUM_THREADS=1 python train_ablation.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
+--batch 4 --nepoch 45 --nworker 4 --lr 0.0016 \
+--use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 15.0 --use_dw \
+--log --auxiliary --use_adj_frame_pred --model MulUniGridInsGRUMotionNetVAE32x32 \
+--logpath /mnt/personal/qiankangan/logs/MulUniGridInsGRUMotionNetVAE32x32_bs4_ablation --general --gpu 0 \
+--sensor_type nuscenes --grid_prior
 
-OMP_NUM_THREADS=1 python eval.py --data /mnt/personal/qiankangan/val \
---model /home/qiankangan/MotionNet/logs/train_multi_seq/2024-07-31_11-03-56/epoch_40.pth \
---split test --log logs/nutest --bs 1 --net MotionNet
+# 64x64
+OMP_NUM_THREADS=1 python train_ablation.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
+--batch 4 --nepoch 45 --nworker 4 --lr 0.0016 \
+--use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 15.0 --use_dw \
+--log --auxiliary --use_adj_frame_pred --model MulUniGridInsGRUMotionNetVAE64x64 \
+--logpath /mnt/personal/qiankangan/logs/MulUniGridInsGRUMotionNetVAE64x64_bs4_ablation --general --gpu 3 \
+--sensor_type nuscenes --grid_prior
 
-OMP_NUM_THREADS=1 python eval.py --data /mnt/personal/qiankangan/at128_0/train \
---model /home/qiankangan/MotionNet/logs/train_multi_seq/2024-07-31_11-03-56/epoch_40.pth \
---split test --log logs/nutest2 --bs 1 --net MotionNet
+# data aug
+# OMP_NUM_THREADS=1 python train_VAE.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
+# --batch 2 --nepoch 45 --nworker 4 --lr 0.0016 \
+# --use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 15.0 --use_dw \
+# --log --auxiliary --use_adj_frame_pred --model UniGRUVAE_MotionNet \
+# --logpath /mnt/personal/qiankangan/logs/UniGRUVAE_aug_bs2_MotionNet --general --gpu $GPU \
+# --sensor_type $sensor_type --use_dir_aug
+
+# MotionNet + aug
+# OMP_NUM_THREADS=1 python train_multi_seq.py --data /mnt/personal/qiankangan/input-data --evaldata /mnt/personal/qiankangan/val \
+# --batch 8 --nepoch 45 --nworker 4 --lr 0.0016 \
+# --use_bg_tc --reg_weight_bg_tc 0.1 --use_fg_tc --reg_weight_fg_tc 2.5 --use_sc --reg_weight_sc 15.0 \
+# --log --model En_MotionNet \
+# --logpath /mnt/personal/qiankangan/logs/MotionNet_aug_bs8_MotionNet --general --gpu $GPU \
+# --use_dir_aug

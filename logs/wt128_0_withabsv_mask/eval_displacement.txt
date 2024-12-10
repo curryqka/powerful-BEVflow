@@ -1,0 +1,173 @@
+--------------------------------------------------------------
+For cells within speed range [0.0, 0.0]:
+
+Frame 1:
+The mean error is 7.784013482391151e-06
+The 50% error quantile is 0.0
+Frame 2:
+The mean error is 1.147129712373841e-05
+The 50% error quantile is 0.0
+Frame 3:
+The mean error is 1.4883247142221247e-05
+The 50% error quantile is 0.0
+Frame 4:
+The mean error is 1.7661322846215665e-05
+The 50% error quantile is 0.0
+Frame 5:
+The mean error is 2.0126182746467556e-05
+The 50% error quantile is 0.0
+Frame 6:
+The mean error is 2.2029268696393855e-05
+The 50% error quantile is 0.0
+Frame 7:
+The mean error is 2.193121465251775e-05
+The 50% error quantile is 0.0
+Frame 8:
+The mean error is 2.2256019711683903e-05
+The 50% error quantile is 0.0
+Frame 9:
+The mean error is 2.2794907663086095e-05
+The 50% error quantile is 0.0
+Frame 10:
+The mean error is 2.379708530450114e-05
+The 50% error quantile is 0.0
+--------------------------------------------------------------
+
+--------------------------------------------------------------
+For cells within speed range [0.0, 5.0]:
+
+Frame 1:
+The mean error is 0.0763456915347908
+The 50% error quantile is 0.0
+Frame 2:
+The mean error is 0.11633747835842642
+The 50% error quantile is 0.0
+Frame 3:
+The mean error is 0.14297702110384092
+The 50% error quantile is 0.0
+Frame 4:
+The mean error is 0.1627683621633303
+The 50% error quantile is 0.0
+Frame 5:
+The mean error is 0.18392407633964541
+The 50% error quantile is 0.0
+Frame 6:
+The mean error is 0.20565860477887463
+The 50% error quantile is 0.0
+Frame 7:
+The mean error is 0.22891343670654943
+The 50% error quantile is 0.0
+Frame 8:
+The mean error is 0.25157836938135325
+The 50% error quantile is 0.0
+Frame 9:
+The mean error is 0.27775071201809953
+The 50% error quantile is 0.0
+Frame 10:
+The mean error is 0.29868543981497914
+The 50% error quantile is 0.0
+--------------------------------------------------------------
+
+--------------------------------------------------------------
+For cells within speed range [5.0, 20.0]:
+
+Frame 1:
+The mean error is 0.06918562054633887
+The 50% error quantile is 0.0
+Frame 2:
+The mean error is 0.1183086687646358
+The 50% error quantile is 0.0
+Frame 3:
+The mean error is 0.1681358461819621
+The 50% error quantile is 0.0
+Frame 4:
+The mean error is 0.21985830755287203
+The 50% error quantile is 0.0
+Frame 5:
+The mean error is 0.2718209778265524
+The 50% error quantile is 0.0
+Frame 6:
+The mean error is 0.32342700434812416
+The 50% error quantile is 0.0
+Frame 7:
+The mean error is 0.37574925114482705
+The 50% error quantile is 0.0
+Frame 8:
+The mean error is 0.428479403683226
+The 50% error quantile is 0.0
+Frame 9:
+The mean error is 0.4791379569609305
+The 50% error quantile is 0.0
+Frame 10:
+The mean error is 0.5333250378873623
+The 50% error quantile is 0.0
+--------------------------------------------------------------
+
+Mean pixel classification accuracy: 0.974316994534207
+mean cat accuracy of Bg: 0.9868783167053252
+mean cat accuracy of Vehicle: 0.9463501900632871
+mean cat accuracy of Ped: 0.7961819704158526
+mean cat accuracy of Bike: 0.7913955746687937
+mean instance acc: 0.8802015129633147
+
+Reshape the displacement prediction statistics into a column:
+7.784013482391151e-06
+1.147129712373841e-05
+1.4883247142221247e-05
+1.7661322846215665e-05
+2.0126182746467556e-05
+2.2029268696393855e-05
+2.193121465251775e-05
+2.2256019711683903e-05
+2.2794907663086095e-05
+2.379708530450114e-05
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0763456915347908
+0.11633747835842642
+0.14297702110384092
+0.1627683621633303
+0.18392407633964541
+0.20565860477887463
+0.22891343670654943
+0.25157836938135325
+0.27775071201809953
+0.29868543981497914
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.06918562054633887
+0.1183086687646358
+0.1681358461819621
+0.21985830755287203
+0.2718209778265524
+0.32342700434812416
+0.37574925114482705
+0.428479403683226
+0.4791379569609305
+0.5333250378873623
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0

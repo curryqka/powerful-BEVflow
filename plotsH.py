@@ -18,16 +18,21 @@ from data.dataH_utils import LidarPointCloud,HeLidarPointCloud,Box
 from pyquaternion import Quaternion
 
 from data.data_utils import calc_displace_vector, point_in_hull_fast, voxelize_occupy,\
-                            calc_displace_vector_He, point_in_hull_fast_He
-from model import FeatEncoder, MotionNet, MotionNetMGDA
+                            calc_displace_vector_He, point_in_hull_fast_He, voxelize_with_velocity
+from model.model import FeatEncoder, MotionNet, MotionNetMGDA
+from model.model import GeneralMotionNet, MixGeneralMotionNet, VAE_GeneralMotionNet, LowerGeneralMotionNet
 
 color_map = {0: "c", 1: "m", 2: "k", 3: "y", 4: "r"}
 cat_names = {0: "bg", 1: "bus", 2: "ped", 3: "bike", 4: "other"}
 
 os.environ['CUDA_VISIBLE_DEVICES'] = "6"
 def check_folder(folder_path):
-    if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
+    if len(folder_path.split('/')) >= 2:
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+    else:
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
     return folder_path
 
 
@@ -44,6 +49,7 @@ def vis_scene_data(
     use_adj_frame_pred=True,
     use_motion_state_pred_masking=True,
     disp=True,
+    args=None,
 ):
     """
     Visualize the scene data.
@@ -64,21 +70,27 @@ def vis_scene_data(
     if data_path is None:
         raise ValueError("Should specify the nuScenes data path.")
     
-    sample_json_files="/home/qiankangan/MotionNet/data/output_file.json"
+    # sample_json_files="/home/qiankangan/MotionNet/data/output_file.json"
+    sample_json_files="/mnt/personal/qiankangan/hadata/wt128_0_sample/wt128_0_val_output_file.json"
     with open(sample_json_files, 'r') as f:
         lines = f.read()
         parsed_data = json.loads(lines)
-
-    hedataset = CustomDataset(root_path=data_path, sensor_type="at128_0", data_type="train",
-                        split_file_path=index_file_path)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    nsweeps_back = 10
-    nsweeps_forward = 5
+    nsweeps_back = 20
+    nsweeps_forward = 10
+    out_seq_len = nsweeps_forward
     past_frame_skip = 1  # when generating the BEV maps, how many history frames need to be skipped
     future_frame_skip = 0  # when generating the BEV maps, how many future frames need to be skipped
     num_frame_skipped = 0
 
+    # hedataset = CustomDataset(root_path=data_path, sensor_type="wt128_0", data_type="train",
+    #                     split_file_path=index_file_path)
+    hedataset = CustomDataset(root_path=data_path, sensor_type='wt128_0', data_type='val', \
+                            split_file_path=index_file_path, \
+                            save_split_file_path = "/mnt/personal/qiankangan/hadata", save_sample_file_path = '/mnt/personal/qiankangan/hadata', \
+                            frame_skip=1, history_frames = nsweeps_back, future_frames = nsweeps_forward)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     voxel_size = (0.25, 0.25, 0.4)
     # area_extents = np.array([[-32.0, 32.0], [-32.0, 32.0], [-3, 2]])
     area_extents = np.array([[0, 64.0], [-32., 32.0], [-2, 3]])
@@ -101,14 +113,68 @@ def vis_scene_data(
 
     # Load pre-trained network weights
     loaded_models = list()
-    if which_model == "MotionNet":
-        model = MotionNet(out_seq_len=5, motion_category_num=2, height_feat_size=13)
-
+    height_feat_size = 13
+    if which_model == 'MotionNet' or which_model == 'be-sti':
+        # model = GeneralMotionNet(out_seq_len=10, motion_category_num=2, height_feat_size=height_feat_size)
+        if args.use_v and args.use_vdir:
+            if which_model == 'MotionNet':
+                model = GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+            elif which_model == 'be-sti':
+                model = Generalbesti(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+        elif args.use_v and not args.use_vdir:
+            if which_model == 'MotionNet':
+                model = GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+            elif which_model == 'be-sti':
+                model = Generalbesti(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+        else:
+            if which_model == 'MotionNet':
+                model = MotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+            elif which_model == 'be-sti':
+                model = besti(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
         model = nn.DataParallel(model)
         checkpoint = torch.load(trained_model_path)
-        model.load_state_dict(checkpoint["model_state_dict"])
+        model.load_state_dict(checkpoint['model_state_dict'])
         model = model.to(device)
+        loaded_models = [model]
+    elif which_model == "LowerGeneralMotionNet":
+        if args.use_v and args.use_vdir:
+            model = LowerGeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+        elif args.use_v and not args.use_vdir:
+            model = LowerGeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+        else:
+            model = LowerGeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(trained_model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+        loaded_models = [model]
+    elif which_model == "MixGeneralMotionNet":
+        if args.use_v and args.use_vdir:
+            model = MixGeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size,
+                                    with_direction=True)
+        elif args.use_v and not args.use_vdir:
+            model = MixGeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size,
+                                    with_direction=False)
+        else:
+            model = MotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(trained_model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+        loaded_models = [model]
+    elif which_model == "UniGenMotionNet":
 
+        # Generative + velocity
+        if args.use_v and args.use_vdir:
+            model = VAE_GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 2)
+        elif args.use_v and not args.use_vdir:
+            model = VAE_GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size + 1)
+        else:
+            model = VAE_GeneralMotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+        model = nn.DataParallel(model)
+        checkpoint = torch.load(trained_model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
         loaded_models = [model]
     else:
         model_encoder = FeatEncoder()
@@ -278,26 +344,66 @@ def vis_scene_data(
         padded_voxel_points_list = list()  # This contains the compact representation of voxelization, as in the paper
 
         for i in range(num_past_pcs):
-            res = voxelize_occupy(pc_list[i], voxel_size=voxel_size, extents=area_extents)
+            res = voxelize_occupy(pc_list[i], voxel_size=voxel_size, extents=area_extents, sensor_type=args.sensor_type)
             padded_voxel_points_list.append(res)
 
         # Compile the batch of voxels, so that they can be fed into the network
         padded_voxel_points = torch.from_numpy(np.stack(padded_voxel_points_list, axis=0))
 
+        if args.sensor_type == 'wt128_0':
+            padded_voxel_velocity_list = list()
+            padded_voxel_direction_list = list()
+            padded_voxel_cos_voxel_list = list()
+            padded_pixel_velocity_list = list()
+            padded_pixel_direction_list = list()
+            padded_pixel_cos_list = list()
+
+            for i in range(num_past_pcs):
+                velocity_voxel, direction_voxel, direction_cos_voxel,\
+                    velocity_pixel, direction_pixel, direction_cos_pixel \
+                        = voxelize_with_velocity(pc_list[i], voxel_size=voxel_size, \
+                                                extents=area_extents, return_indices=False)
+                padded_voxel_velocity_list.append(velocity_voxel)
+                padded_voxel_direction_list.append(direction_voxel)
+                padded_voxel_cos_voxel_list.append(direction_cos_voxel)
+                padded_pixel_velocity_list.append(velocity_pixel)
+                padded_pixel_direction_list.append(direction_pixel)
+                padded_pixel_cos_list.append(direction_cos_pixel)
+
+            padded_voxel_velocity = torch.from_numpy(np.stack(padded_voxel_velocity_list, axis=0))
+            padded_voxel_direction = torch.from_numpy(np.stack(padded_voxel_direction_list, axis=0))
+            padded_voxel_cos_voxel = torch.from_numpy(np.stack(padded_voxel_cos_voxel_list, axis=0))
+            padded_pixel_velocity = torch.from_numpy(np.stack(padded_pixel_velocity_list, axis=0))
+            padded_pixel_direction = torch.from_numpy(np.stack(padded_pixel_direction_list, axis=0))
+            padded_pixel_cos = torch.from_numpy(np.stack(padded_pixel_cos_list, axis=0))
+
         # Finally, generate the ground-truth displacement field
         all_disp_field_gt, all_valid_pixel_maps, non_empty_map, pixel_cat_map = gen_2d_grid_gt_for_visualization(
             save_data_dict, grid_size=voxel_size[0:2], reordered=True, extents=area_extents, frame_skip=frame_skip
         )
-
-        bev_input_data = (
-            padded_voxel_points,
-            all_disp_field_gt,
-            all_valid_pixel_maps,
-            non_empty_map,
-            pixel_cat_map,
-            num_past_pcs,
-            num_future_pcs,
-        )
+        if args.sensor_type == "wt128_0":
+            bev_input_data = (
+                padded_voxel_points,
+                all_disp_field_gt,
+                all_valid_pixel_maps,
+                non_empty_map,
+                pixel_cat_map,
+                num_past_pcs,
+                num_future_pcs,
+                padded_pixel_velocity,
+                padded_pixel_direction,
+                padded_pixel_cos,
+            )
+        else:
+            bev_input_data = (
+                padded_voxel_points,
+                all_disp_field_gt,
+                all_valid_pixel_maps,
+                non_empty_map,
+                pixel_cat_map,
+                num_past_pcs,
+                num_future_pcs,
+            )
 
         vis_model_per_sample_data(
             bev_input_data,
@@ -312,6 +418,7 @@ def vis_scene_data(
             disp=disp,
             use_motion_state_pred_masking=use_motion_state_pred_masking,
             frame_idx=seq_num,
+            input_frame=args.input_frames
         )
 
         seq_num += 1
@@ -600,6 +707,8 @@ def vis_model_per_sample_data(
     use_motion_state_pred_masking=True,
     frame_idx=0,
     disp=True,
+    input_frame=5,
+    disp_error=False,
 ):
     """
     Visualize the prediction (ie, displacement field) results.
@@ -623,11 +732,16 @@ def vis_model_per_sample_data(
         raise ValueError("Need to specify image save path.")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    fig, ax = plt.subplots(1, 4, figsize=(20, 8))
+    if disp_error:
+        fig, ax = plt.subplots(1, 4, figsize=(20, 8))
+    else:
+        fig, ax = plt.subplots(1, 3, figsize=(20, 8))
 
     # Load pre-trained network weights
-    if which_model == "MotionNet":
+    if which_model == 'MotionNet' or which_model == 'be-sti' or which_model == 'UniGenMotionNet' \
+        or which_model == "MixGeneralMotionNet" or which_model == "LowerGeneralMotionNet":
         model = loaded_models[0]
+    # if which_model == "MotionNet" or which_mode:
     else:
         model_encoder = loaded_models[0]
         model_head = loaded_models[1]
@@ -641,20 +755,40 @@ def vis_model_per_sample_data(
         pixel_cat_map_gt,
         num_past_pcs,
         num_future_pcs,
+        padded_pixel_velocity,
+        padded_pixel_direction,
+        padded_pixel_cos,
     ) = bev_input_data
-
-    padded_voxel_points = torch.unsqueeze(padded_voxel_points, 0).to(device)
-
+    # breakpoint()
+    padded_voxel_points = torch.unsqueeze(padded_voxel_points[-input_frame:], 0).to(device)
+    all_pixel_velocity_maps = torch.unsqueeze(padded_pixel_velocity[-input_frame:].unsqueeze(-1), 0).to(device)
+    all_pixel_direction_maps = torch.unsqueeze(padded_pixel_direction[-input_frame:].unsqueeze(-1), 0).to(device)
     # Make prediction
-    if which_model == "MotionNet":
+    if which_model == 'MotionNet' or which_model == 'be-sti' or which_model == 'UniGenMotionNet' \
+        or which_model == "MixGeneralMotionNet" or which_model == "LowerGeneralMotionNet":
         model.eval()
     else:
         model_encoder.eval()
         model_head.eval()
 
     with torch.no_grad():
-        if which_model == "MotionNet":
-            disp_pred, cat_pred, motion_pred = model(padded_voxel_points)
+        if which_model == 'MotionNet' or which_model == 'be-sti' \
+            or which_model == "MixGeneralMotionNet" or which_model == "LowerGeneralMotionNet":
+
+            if args.use_v and args.use_vdir:
+                disp_pred, cat_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps, all_pixel_direction_maps)
+            elif args.use_v and not args.use_vdir:
+                disp_pred, cat_pred, motion_pred = model(padded_voxel_points, all_pixel_velocity_maps) 
+            else:
+                disp_pred, cat_pred, motion_pred = model(padded_voxel_points) 
+        # disp_pred, cat_pred, motion_pred = model(padded_voxel_points)
+        elif which_model == "UniGenMotionNet":
+            if args.use_v and args.use_vdir:
+                disp_pred, cat_pred, motion_pred, _ = model(padded_voxel_points, prior_velocity=all_pixel_velocity_maps, prior_direction=all_pixel_direction_maps)
+            elif args.use_v and not args.use_vdir:
+                disp_pred, cat_pred, motion_pred, _ = model(padded_voxel_points, prior_velocity=all_pixel_velocity_maps) 
+            else:
+                disp_pred, cat_pred, motion_pred, _ = model(padded_voxel_points)
         else:
             shared_feats = model_encoder(padded_voxel_points)
             disp_pred, cat_pred, motion_pred = model_head(shared_feats)
@@ -811,23 +945,23 @@ def vis_model_per_sample_data(
         ax[2].title.set_text("Prediction")
         ax[2].axis("off")
 
+        if disp_error:
+            # ------------------------ error ------------------------
+            # Show the prediction results. We show the cells corresponding to the non-empty one-hot gt cells.
 
-        # ------------------------ error ------------------------
-        # Show the prediction results. We show the cells corresponding to the non-empty one-hot gt cells.
 
+            # We use the same indices as the ground-truth, since we are currently focused on the foreground
+            X_error = X
+            Y_error = Y
+            U_error = (field_pred[:, :, 0][mask] - field_gt[:, :, 0][mask] ) / voxel_size[0]
+            V_error = (field_pred[:, :, 1][mask] - field_gt[:, :, 1][mask] ) / voxel_size[1]
 
-        # We use the same indices as the ground-truth, since we are currently focused on the foreground
-        X_error = X
-        Y_error = Y
-        U_error = (field_pred[:, :, 0][mask] - field_gt[:, :, 0][mask] ) / voxel_size[0]
-        V_error = (field_pred[:, :, 1][mask] - field_gt[:, :, 1][mask] ) / voxel_size[1]
-
-        ax[3].quiver(X_error, Y_error, U_error, V_error, angles="xy", scale_units="xy", scale=1, color=color_map[k])
-        ax[3].set_xlim(border_pixel, field_pred.shape[0] - border_pixel)
-        ax[3].set_ylim(border_pixel, field_pred.shape[1] - border_pixel)
-        ax[3].set_aspect("equal")
-        ax[3].title.set_text("error")
-        ax[3].axis("off")
+            ax[3].quiver(X_error, Y_error, U_error, V_error, angles="xy", scale_units="xy", scale=1, color=color_map[k])
+            ax[3].set_xlim(border_pixel, field_pred.shape[0] - border_pixel)
+            ax[3].set_ylim(border_pixel, field_pred.shape[1] - border_pixel)
+            ax[3].set_aspect("equal")
+            ax[3].title.set_text("error")
+            ax[3].axis("off")
     print("finish sample {}".format(frame_idx))
     plt.savefig(os.path.join(img_save_dir, str(frame_idx) + ".png"))
 
@@ -836,7 +970,8 @@ def vis_model_per_sample_data(
     ax[0].clear()
     ax[1].clear()
     ax[2].clear()
-    ax[3].clear()
+    if disp_error:
+        ax[3].clear()
 
     if disp:
         plt.show()
@@ -885,6 +1020,13 @@ if __name__ == "__main__":
     parser.add_argument("--adj", action="store_false", help="Whether predict the relative offset between frames")
     parser.add_argument("--disp", action="store_true", help="Whether to immediately show the images")
     parser.add_argument("--jitter", action="store_false", help="Whether to apply jitter suppression")
+
+    parser.add_argument("--input_frames", default=5, type=int, help="The number of input frames")
+    parser.add_argument('--sensor_type', default='nuscenes', type=str, help='The dataset')
+    parser.add_argument('--use_v', action='store_true', help='whether to apply velocity')
+    parser.add_argument('--use_vdir', action='store_true', help='whether to apply velocity direction')
+    parser.add_argument('--debug', action='store_true', help='Whether to use debug mode')
+
     args = parser.parse_args()
     print(args)
     
@@ -897,8 +1039,9 @@ if __name__ == "__main__":
         if not if_disp:
             matplotlib.use("AGG")
 
-        index_file_path="HeTools/total_filter_val_filter_01.list"
+        # index_file_path="HeTools/total_filter_val_filter_01.list"
         # index_file_path = "HeTools/test.list"
+        index_file_path = "/mnt/personal/qiankangan/hadata/wt128_0_splitfile/wt128_0_val.list"
         with open(index_file_path, 'r') as f:
             scene_list = [line.strip() for line in f.readlines()]
         print(f"The processing scene is {scene_list[args.scene]}")
@@ -915,6 +1058,7 @@ if __name__ == "__main__":
             disp=if_disp,
             use_motion_state_pred_masking=args.jitter,
             begin_frame=args.beginframe,
+            args=args,
         )
     else:
         frames_dir = os.path.join("/media/pwu/Data/3D_data/nuscene/logs/images_job_talk", image_save_dir)

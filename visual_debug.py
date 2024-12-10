@@ -64,8 +64,9 @@ def vis_scene_data(
     if data_path is None:
         raise ValueError("Should specify the nuScenes data path.")
 
-    sample_json_files="./data/sample/train_output_file.json"
+    # sample_json_files="./data/sample/train_output_file.json"
     # sample_json_files = "./data/wt128_0_sample/wt128_0_train_output_file.json"
+    sample_json_files = "/mnt/personal/qiankangan/hadata/wt128_0_sample/wt128_0_train_output_file.json"
     with open(sample_json_files, 'r') as f:
         lines = f.read()
         parsed_data = json.loads(lines)
@@ -884,8 +885,8 @@ if __name__ == "__main__":
             matplotlib.use("AGG")
 
         # index_file_path="/mnt/personal/ts/others/qinghua/shiyining/seqs.list"
-        # index_file_path = "/home/qiankangan/MotionNet/data/wt128_0_splitfile/wt128_0_train.list"
-        index_file_path="/home/qiankangan/MotionNet/data/splitfile/train.list"
+        index_file_path = "/mnt/personal/qiankangan/hadata/wt128_0_splitfile/wt128_0_train.list"
+        # index_file_path="/home/qiankangan/MotionNet/data/splitfile/train.list"
         with open(index_file_path, 'r') as f:
             scene_list = [line.strip() for line in f.readlines()]
         print(f"The processing scene is {scene_list[args.scene]}")

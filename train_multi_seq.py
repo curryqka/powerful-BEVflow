@@ -16,6 +16,7 @@ import torch.optim as optim
 
 from data.nuscenes_dataloader import TrainDatasetMultiSeq, DatasetSingleSeq
 from model.model import MotionNet
+from model.en_model import En_MotionNet
 # from model.be_sti import MotionNet
 
 
@@ -46,7 +47,7 @@ class AverageMeter(object):
 
 def check_folder(folder_path):
     if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
+        os.makedirs(folder_path)
     return folder_path
 
 
@@ -56,7 +57,7 @@ pred_adj_frame_distance = True  # Whether to predict the relative offset between
 height_feat_size = 13  # The size along the height dimension
 cell_category_num = 5  # The number of object categories (including the background)
 
-out_seq_len = 10  # The number of future frames we are going to predict
+out_seq_len = 20  # The number of future frames we are going to predict
 trans_matrix_idx = (
     1  # Among N transformation matrices (N=2 in our experiment), which matrix is used for alignment (see paper)
 )
@@ -72,11 +73,14 @@ parser.add_argument(
 parser.add_argument(
     "--resume", default="", type=str, help="The path to the saved model that is loaded to resume training"
 )
+parser.add_argument('--model', default="MotionNet", type=str, help="choose model[MotionNet, ...]")
+
 parser.add_argument("--batch", default=8, type=int, help="Batch size")
 parser.add_argument("--nepoch", default=45, type=int, help="Number of epochs")
 parser.add_argument("--nworker", default=4, type=int, help="Number of workers")
 
 parser.add_argument("--lr", default=0.0032, type=float, help="The model learning rate")
+parser.add_argument('--use_dir_aug', action='store_true', help='Whether to use direction augmentation')
 
 parser.add_argument(
     "--reg_weight_bg_tc", default=0.1, type=float, help="Weight of background temporal consistency term"
@@ -87,7 +91,9 @@ parser.add_argument("--reg_weight_sc", default=15.0, type=float, help="Weight of
 parser.add_argument("--use_bg_tc", action="store_true", help="Whether to use background temporal consistency loss")
 parser.add_argument("--use_fg_tc", action="store_true", help="Whether to use foreground loss in st.")
 parser.add_argument("--use_sc", action="store_true", help="Whether to use spatial consistency loss")
+parser.add_argument('--use_dw', action='store_true', help='Whether to use spatial consistency loss')
 
+parser.add_argument("--general", action="store_true", help="Mask flag")
 parser.add_argument("--nn_sampling", action="store_true", help="Whether to use nearest neighbor sampling in bg_tc loss")
 parser.add_argument("--log", action="store_true", help="Whether to log")
 parser.add_argument("--logpath", default="", help="The path to the output log file")
@@ -108,15 +114,16 @@ reg_weight_sc = args.reg_weight_sc  # The weight of spatial consistency term
 use_bg_temporal_consistency = args.use_bg_tc
 use_fg_temporal_consistency = args.use_fg_tc
 use_spatial_consistency = args.use_sc
+use_disp_weighted_loss = args.use_dw
 
 use_nn_sampling = args.nn_sampling
-
+get_general = args.general
 voxel_size = (0.25, 0.25, 0.4)
 # area_extents = np.array([[-32.0, 32.0], [-32.0, 32.0], [-3.0, 2.0]])
 # area_extents = np.array([[0, 64.0], [-32.0, 32.0], [0, 5.0]])
 area_extents = np.array([[0., 64.], [-32., 32.], [-2., 3.]])
-h, w, c = (area_extents[:, 1] - area_extents[:, 0]).astype(np.float32)/voxel_size
-h, w, c = int(h), int(w), int(c)
+H, W, c = (area_extents[:, 1] - area_extents[:, 0]).astype(np.float32)/voxel_size
+H, W, c = int(H), int(W), int(c)
 
 def main():
     start_epoch = 1
@@ -191,7 +198,12 @@ def main():
 
     evalloader = torch.utils.data.DataLoader(evalset, batch_size=1, shuffle=False, num_workers=num_workers)
 
-    model = MotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+    if args.model == "MotionNet":
+        model = MotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+    elif args.model == "En_MotionNet":
+        model = En_MotionNet(out_seq_len=out_seq_len, motion_category_num=2, height_feat_size=height_feat_size)
+
+    
     model = nn.DataParallel(model)
     model = model.to(device)
 
@@ -229,7 +241,9 @@ def main():
         # eval the model
         model.eval()
         # TODO: eval function
-        me_static, me_slow, me_fast, pixel_acc = \
+        me_static, me_slow, me_fast, pixel_acc = 1e3, 1e3, 1e3, 1e3
+        best_metric = me_static + me_fast
+        me_static, me_slow, me_fast, quantile_50_static, quantile_50_slow, quantile_50_fast, pixel_acc = \
             eval_motion_displacement(model=model, dataloader=evalloader, dataset=evalset, device=device, \
                                     num_future_sweeps=out_seq_len)
         # me_static, me_slow, me_fast, pixel_acc = 0,0,0,0
@@ -242,7 +256,31 @@ def main():
 
         # save model
         # if need_log and (epoch % 5 == 0 or epoch == num_epochs or epoch == 1 or epoch > 45):
-        if need_log and (epoch > 5) and (epoch % 5 == 0):
+        # if need_log and (epoch > 5) and (epoch % 5 == 0):
+        #     save_dict = {
+        #         "epoch": epoch,
+        #         "model_state_dict": model.state_dict(),
+        #         "optimizer_state_dict": optimizer.state_dict(),
+        #         "scheduler_state_dict": scheduler.state_dict(),
+        #         "loss": loss_disp.avg,
+        #     }
+        #     torch.save(save_dict, os.path.join(model_save_path, "epoch_" + str(epoch) + ".pth"))
+        # save model
+        """save the best models"""
+        new_metric = me_static + me_fast
+        if new_metric < best_metric:
+            best_metric = new_metric
+            if need_log:
+                save_dict = {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": scheduler.state_dict(),
+                "loss": loss_disp.avg,
+            }
+            torch.save(save_dict, os.path.join(model_save_path, "save_model.pth"))
+        # if need_log and (epoch % 5 == 0 or epoch == num_epochs or epoch == 1 or epoch > 45):
+        if need_log and (epoch % 2 == 0 or epoch == 1):
             save_dict = {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
@@ -281,14 +319,19 @@ def train(model, criterion, trainloader, optimizer, device, epoch):
         # assert padded_voxel_points_list.shape == (28, 2, 5, 256, 256, 13)
         # Move to GPU/CPU
         # padded_voxel_points = padded_voxel_points.view(-1, num_past_frames[0].item(), 256, 256, height_feat_size)
-        padded_voxel_points = padded_voxel_points.view(-1, num_past_frames[0].item(), h, w, height_feat_size)
+        padded_voxel_points = padded_voxel_points.view(-1, num_past_frames[0].item(), H, W, height_feat_size)
         padded_voxel_points = padded_voxel_points.to(device)
 
         # Make prediction
-        disp_pred, class_pred, motion_pred = model(padded_voxel_points)
+        if args.model == "MotionNet":
+            disp_pred, class_pred, motion_pred = model(padded_voxel_points)
+        elif args.model == "En_MotionNet":
+            disp_pred, class_pred, motion_pred, aug_disp_list = model(padded_voxel_points, \
+                                                                    dir_aug=args.use_dir_aug)  
 
+        optimizer.zero_grad()
         # Compute and back-propagate the losses
-        loss_disp, loss_class, loss_motion, loss_bg_tc, loss_sc, loss_fg_tc = compute_and_bp_loss(
+        loss_all, loss_disp, loss_class, loss_motion, loss_bg_tc, loss_sc, loss_fg_tc = compute_and_bp_loss(
             optimizer,
             device,
             num_future_frames[0].item(),
@@ -304,7 +347,22 @@ def train(model, criterion, trainloader, optimizer, device, epoch):
             trans_matrices,
             pixel_instance_map,
         )
+        
+        # compute augment loss
+        # loss_aug_list = []
+        total_loss_aug = 0.0
+        if args.use_dir_aug:
+            for aug_disp in aug_disp_list:
+                loss_aug, loss_aug_disp, loss_bg_tc, loss_sc, loss_fg_tc \
+                    = compute_aug_loss(optimizer, device, num_future_frames[0].item(), all_disp_field_gt, all_valid_pixel_maps,
+                                pixel_cat_map_gt, aug_disp, criterion, non_empty_map, class_pred, motion_gt,
+                                motion_pred, trans_matrices, pixel_instance_map)
+                total_loss_aug += loss_aug
+            total_loss_aug = total_loss_aug / len(aug_disp_list)
+            loss_all += 0.5 * total_loss_aug
 
+        loss_all.backward()
+        optimizer.step()
         if not all((loss_disp, loss_class, loss_motion)):
             print(
                 "{}, \t{}, \tat epoch {}, \titerations {} [empty occupy map]".format(
@@ -319,18 +377,19 @@ def train(model, criterion, trainloader, optimizer, device, epoch):
         running_loss_disp.update(loss_disp)
         running_loss_class.update(loss_class)
         running_loss_motion.update(loss_motion)
-        print(
-            "[{}/{}]\t{}, \t{}, \t{}, \t{}, \t{}, \t{}".format(
-                epoch,
-                i,
-                running_loss_disp,
-                running_loss_class,
-                running_loss_motion,
-                running_loss_bg_tc,
-                running_loss_sc,
-                running_loss_fg_tc,
+        if (i+1) % 100 == 0:
+            print(
+                "[{}/{}]\t{}, \t{}, \t{}, \t{}, \t{}, \t{}".format(
+                    epoch,
+                    i,
+                    running_loss_disp,
+                    running_loss_class,
+                    running_loss_motion,
+                    running_loss_bg_tc,
+                    running_loss_sc,
+                    running_loss_fg_tc,
+                )
             )
-        )
 
     return (
         running_loss_disp,
@@ -344,7 +403,7 @@ def train(model, criterion, trainloader, optimizer, device, epoch):
 # eval function
 def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_path=None, use_adj_frame_pred=True,
                              future_frame_skip=0,
-                             num_future_sweeps=10, batch_size=1, use_motion_state_pred_masking=True,
+                             num_future_sweeps=20, batch_size=1, use_motion_state_pred_masking=True,
                              general_flag = False):
     """
     Evaluate the motion prediction results.
@@ -381,7 +440,7 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
 
     for i, data in enumerate(dataloader, 0):
         padded_voxel_points, all_disp_field_gt, all_valid_pixel_maps, \
-            non_empty_map, pixel_cat_map_gt, past_steps, future_steps, motion_gt = data
+            non_empty_map, pixel_cat_map_gt, pixel_instance_map_gt, past_steps, future_steps, motion_gt = data
 
         padded_voxel_points = padded_voxel_points.to(device)
 
@@ -401,7 +460,10 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
             cat_nongeneral_map[pixel_cat_map_numpy == 5] = 1
 
         with torch.no_grad():
-            disp_pred, class_pred, motion_pred = model(padded_voxel_points)
+            if args.model == "MotionNet":
+                disp_pred, class_pred, motion_pred = model(padded_voxel_points)
+            elif args.model == "En_MotionNet":
+                disp_pred, class_pred, motion_pred, _ = model(padded_voxel_points)
             
 
             pred_shape = disp_pred.size()
@@ -424,21 +486,21 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
 
                 # For those with very small movements, we consider them as static
                 last_pred = disp_pred[:, -1, :, :, :]
-                last_pred_norm = np.linalg.norm(last_pred, ord=2, axis=1)  # out: (batch, h, w)
+                last_pred_norm = np.linalg.norm(last_pred, ord=2, axis=1)  # out: (batch, H, W)
                 thd_mask = last_pred_norm <= 0.2
 
                 cat_weight_map = np.ones_like(class_pred_cat, dtype=np.float32)
                 cat_weight_map[mask] = 0.0
                 cat_weight_map[class_mask] = 0.0
                 cat_weight_map[thd_mask] = 0.0
-                cat_weight_map = cat_weight_map[:, np.newaxis, np.newaxis, ...]  # (batch, 1, 1, h, w)
+                cat_weight_map = cat_weight_map[:, np.newaxis, np.newaxis, ...]  # (batch, 1, 1, H, W)
 
                 disp_pred = disp_pred * cat_weight_map
                 if general_flag:
                     disp_pred = disp_pred * cat_nongeneral_map
 
         # Pre-processing
-        all_disp_field_gt = all_disp_field_gt.numpy()  # (bs, seq, h, w, channel)
+        all_disp_field_gt = all_disp_field_gt.numpy()  # (bs, seq, H, W, channel)
         future_steps = future_steps.numpy()[0]
 
         valid_pixel_maps = all_valid_pixel_maps[:, -future_steps:, ...].contiguous()
@@ -528,14 +590,15 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
 
         overall_cls_gt.append(pixel_cat_map_numpy[idx_fg])
         overall_cls_pred.append(class_pred_numpy[idx_fg])
-
-        print("Finish sample [{}/{}]".format(i + 1, int(np.ceil(len(dataset) / float(batch_size)))))
+        if (i+1) % 100 == 0:
+            print("Finish sample [{}/{}]".format(i + 1, int(np.ceil(len(dataset) / float(batch_size)))))
 
     # Compute the statistics
     dump_res = []
 
     # Compute the statistics of displacement prediction error
     me_list = np.zeros([3])
+    quantile_50 = np.zeros([3])
     for i, d in enumerate(speed_intervals):
         group = cell_groups[i]
         print("--------------------------------------------------------------")
@@ -566,6 +629,7 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
                 format(selected_future_sweeps[s], mean_error, error_quantile_50)
             print(msg)
         me_list[i] = mean_error
+        quantile_50[i] = error_quantile_50
         print("--------------------------------------------------------------\n")
         # if save_eval_file_path is not None:
         #     saver.write("--------------------------------------------------------------\n\n")
@@ -599,7 +663,8 @@ def eval_motion_displacement(model, dataloader, dataset, device, save_eval_file_
     #         saver.write("mean cat accuracy of {}: {}\n".format(cat_map[i], mean_cat[i]))
     #     saver.write("mean instance acc: {}\n".format(np.mean(mean_cat)))
 
-    return me_list[0], me_list[1], me_list[2], pixel_acc
+    return me_list[0], me_list[1], me_list[2], quantile_50[0], quantile_50[1], quantile_50[2], \
+            pixel_acc
 
 # Compute and back-propagate the loss
 def compute_and_bp_loss(
@@ -618,15 +683,15 @@ def compute_and_bp_loss(
     trans_matrices,
     pixel_instance_map,
 ):
-    optimizer.zero_grad()
+    # optimizer.zero_grad()
 
     # Compute the displacement loss
-    all_disp_field_gt = all_disp_field_gt.view(-1, future_frames_num, h, w, 2)
+    all_disp_field_gt = all_disp_field_gt.view(-1, future_frames_num, H, W, 2)
     gt = all_disp_field_gt[:, -future_frames_num:, ...].contiguous()
     gt = gt.view(-1, gt.size(2), gt.size(3), gt.size(4))
     gt = gt.permute(0, 3, 1, 2).to(device)
 
-    all_valid_pixel_maps = all_valid_pixel_maps.view(-1, future_frames_num, h, w)
+    all_valid_pixel_maps = all_valid_pixel_maps.view(-1, future_frames_num, H, W)
     valid_pixel_maps = all_valid_pixel_maps[:, -future_frames_num:, ...].contiguous()
     valid_pixel_maps = valid_pixel_maps.view(-1, valid_pixel_maps.size(2), valid_pixel_maps.size(3))
     valid_pixel_maps = torch.unsqueeze(valid_pixel_maps, 1)
@@ -660,18 +725,31 @@ def compute_and_bp_loss(
 
     # ---------------------------------------------------------------------
     # -- Compute the masked displacement loss
-    pixel_cat_map_gt = pixel_cat_map_gt.view(-1, h, w, cell_category_num)
+    pixel_cat_map_gt = pixel_cat_map_gt.view(-1, H, W, cell_category_num)
 
     if use_weighted_loss:  # Note: have also tried focal loss, but did not observe noticeable improvement
         pixel_cat_map_gt_numpy = pixel_cat_map_gt.numpy()
         pixel_cat_map_gt_numpy = np.argmax(pixel_cat_map_gt_numpy, axis=-1) + 1
         cat_weight_map = np.zeros_like(pixel_cat_map_gt_numpy, dtype=np.float32)
+        cat_weight_map_cls = cat_weight_map
         weight_vector = [0.005, 1.0, 1.0, 1.0, 1.0]  # [bg, car & bus, ped, bike, other]
+
+        if get_general:
+            curr_annotated_point_num = np.sum( (pixel_cat_map_gt_numpy != 5) & (pixel_cat_map_gt_numpy != 0) )
+            valid_pixel_num = curr_annotated_point_num
+            weight_vector_general = [0.005, 1.0, 1.0, 1.0, 0.0]
+            
         for k in range(len(weight_vector)):
             mask = pixel_cat_map_gt_numpy == (k + 1)
-            cat_weight_map[mask] = weight_vector[k]
+            if get_general:
+               cat_weight_map[mask] = weight_vector_general[k]
+               cat_weight_map_cls[mask] = weight_vector[k]
+            
+            else:
+                cat_weight_map[mask] = weight_vector[k]
+                cat_weight_map_cls[mask] = weight_vector[k]
 
-        cat_weight_map = cat_weight_map[:, np.newaxis, np.newaxis, ...]  # (batch, 1, 1, h, w)
+        cat_weight_map = cat_weight_map[:, np.newaxis, np.newaxis, ...]  # (batch, 1, 1, H, W)
         cat_weight_map = torch.from_numpy(cat_weight_map).to(device)
         map_shape = cat_weight_map.size()
 
@@ -684,7 +762,7 @@ def compute_and_bp_loss(
 
     # ---------------------------------------------------------------------
     # -- Compute the grid cell classification loss
-    non_empty_map = non_empty_map.view(-1, h, w)
+    non_empty_map = non_empty_map.view(-1, H, W)
     non_empty_map = non_empty_map.to(device)
     pixel_cat_map_gt = pixel_cat_map_gt.permute(0, 3, 1, 2).to(device)
 
@@ -692,7 +770,7 @@ def compute_and_bp_loss(
 
     if use_weighted_loss:
         map_shape = cat_weight_map.size()
-        cat_weight_map = cat_weight_map.view(map_shape[0], map_shape[-2], map_shape[-1])  # (bs, h, w)
+        cat_weight_map = cat_weight_map.view(map_shape[0], map_shape[-2], map_shape[-1])  # (bs, H, W)
         loss_class = torch.sum(-pixel_cat_map_gt * log_softmax_probs, dim=1) * cat_weight_map
     else:
         loss_class = torch.sum(-pixel_cat_map_gt * log_softmax_probs, dim=1)
@@ -700,7 +778,7 @@ def compute_and_bp_loss(
 
     # ---------------------------------------------------------------------
     # -- Compute the speed level classification loss
-    motion_gt = motion_gt.view(-1, h, w, 2)
+    motion_gt = motion_gt.view(-1, H, W, 2)
     motion_gt_numpy = motion_gt.numpy()
     motion_gt = motion_gt.permute(0, 3, 1, 2).to(device)
     log_softmax_motion_pred = F.log_softmax(motion_pred, dim=1)
@@ -729,8 +807,8 @@ def compute_and_bp_loss(
         loss = loss_disp + loss_class + loss_motion + instance_spatio_temp_loss
     else:
         loss = loss_disp + loss_class + loss_motion
-    loss.backward()
-    optimizer.step()
+    # loss.backward()
+    # optimizer.step()
 
     if use_bg_temporal_consistency:
         bg_tc_loss_value = bg_tc_loss.item()
@@ -744,14 +822,126 @@ def compute_and_bp_loss(
         sc_loss_value = -1
         fg_tc_loss_value = -1
 
-    return loss_disp.item(), loss_class.item(), loss_motion.item(), bg_tc_loss_value, sc_loss_value, fg_tc_loss_value
+    return loss, loss_disp.item(), loss_class.item(), loss_motion.item(), bg_tc_loss_value, sc_loss_value, fg_tc_loss_value
 
+def compute_aug_loss(optimizer, device, future_frames_num, all_disp_field_gt, all_valid_pixel_maps, pixel_cat_map_gt,
+                        disp_pred, criterion, non_empty_map, class_pred, motion_gt, motion_pred, trans_matrices,
+                        pixel_instance_map):
+    """compute aux loss"""
+    
+    # compute the displacement loss
+
+    # (bs*2clips, step, H, W, 2)
+    all_disp_field_gt = all_disp_field_gt.view(-1, future_frames_num, H, W, 2)
+    gt = all_disp_field_gt[:, -future_frames_num:, ...].contiguous()
+    gt = gt.view(-1, gt.size(2), gt.size(3), gt.size(4))
+    gt = gt.permute(0, 3, 1, 2).to(device)
+
+    all_valid_pixel_maps = all_valid_pixel_maps.view(-1, future_frames_num, H, W)
+    valid_pixel_maps = all_valid_pixel_maps[:, -future_frames_num:, ...].contiguous()
+    valid_pixel_maps = valid_pixel_maps.view(-1, valid_pixel_maps.size(2), valid_pixel_maps.size(3))
+    valid_pixel_maps = torch.unsqueeze(valid_pixel_maps, 1)
+    valid_pixel_maps = valid_pixel_maps.to(device)
+
+    valid_pixel_num = torch.nonzero(valid_pixel_maps).size(0)
+    if valid_pixel_num == 0:
+        return [None] * 6
+
+    # generate the displacement w.r.t. the keyframe
+    if pred_adj_frame_distance:
+        disp_pred = disp_pred.view(-1, future_frames_num, disp_pred.size(-3), disp_pred.size(-2), disp_pred.size(-1))
+
+        # compute temporal consistency loss
+        if use_bg_temporal_consistency:
+            bg_tc_loss = background_temporal_consistency_loss(disp_pred, pixel_cat_map_gt, non_empty_map, trans_matrices)
+
+        if use_fg_temporal_consistency or use_spatial_consistency:
+            instance_spatio_temp_loss, instance_spatial_loss_value, instance_temporal_loss_value = \
+                instance_spatial_temporal_consistency_loss(disp_pred, pixel_instance_map)
+
+        for c in range(1, disp_pred.size(1)):
+            disp_pred[:, c, ...] = disp_pred[:, c, ...] + disp_pred[:, c - 1, ...]
+        disp_pred = disp_pred.view(-1, disp_pred.size(-3), disp_pred.size(-2), disp_pred.size(-1))
+        
+    """compute the masked displacement loss"""
+    pixel_cat_map_gt = pixel_cat_map_gt.view(-1, H, W, cell_category_num)
+
+    if use_weighted_loss:
+        pixel_cat_map_gt_numpy = pixel_cat_map_gt.cpu().data.numpy()
+        pixel_cat_map_gt_numpy = np.argmax(pixel_cat_map_gt_numpy, axis=-1) + 1
+
+        cat_weight_map = np.zeros_like(pixel_cat_map_gt_numpy, dtype=np.float32)
+        cat_weight_map_cls = cat_weight_map
+        # [bg, vehicle, pedestrian, bike, other]
+        weight_vector = [0.005, 1.0, 1.0, 1.0, 1.0]
+
+        if get_general:
+            curr_annotated_point_num = np.sum( (pixel_cat_map_gt_numpy != 5) & (pixel_cat_map_gt_numpy != 0) )
+            valid_pixel_num = curr_annotated_point_num
+            weight_vector_general = [0.005, 1.0, 1.0, 1.0, 0.0]
+
+        for k in range(len(weight_vector)):
+            mask = pixel_cat_map_gt_numpy == (k + 1)
+            if get_general:
+               cat_weight_map[mask] = weight_vector_general[k]
+               cat_weight_map_cls[mask] = weight_vector[k]
+            
+            else:
+                cat_weight_map[mask] = weight_vector[k]
+                cat_weight_map_cls[mask] = weight_vector[k]
+
+        # shape: [bs, 1, 1, H, W]
+        cat_weight_map = cat_weight_map[:, np.newaxis, np.newaxis, ...]  # (batch, 1, 1, H, W)
+        cat_weight_map = torch.from_numpy(cat_weight_map).to(device)
+        cat_weight_map_cls = cat_weight_map_cls[:, np.newaxis, np.newaxis, ...]
+        cat_weight_map_cls = torch.from_numpy(cat_weight_map_cls).to(device)
+        map_shape = cat_weight_map.size()
+
+        # loss disp size (bs*2clips*seq, 2, h ,w)
+        loss_disp = criterion(gt * valid_pixel_maps, disp_pred * valid_pixel_maps)
+        loss_disp = loss_disp.reshape(map_shape[0], -1, map_shape[-3], map_shape[-2], map_shape[-1])
+
+        if use_disp_weighted_loss:
+            disp_weight_map = choose_disp_weighted_map(gt=all_disp_field_gt, map_shape=map_shape, device=device, mode=args.dw_mode)
+            loss_disp = torch.sum(loss_disp * cat_weight_map * disp_weight_map) / valid_pixel_num
+        else:
+            loss_disp = torch.sum(loss_disp * cat_weight_map) / valid_pixel_num
+    else:
+        loss_disp = criterion(gt * valid_pixel_maps, disp_pred * valid_pixel_maps) / valid_pixel_num
+
+
+
+    """sum up all losses"""
+    if use_bg_temporal_consistency and (use_fg_temporal_consistency or use_spatial_consistency):
+        loss = loss_disp + reg_weight_bg_tc * bg_tc_loss + instance_spatio_temp_loss
+    elif use_bg_temporal_consistency:
+        loss = loss_disp + reg_weight_bg_tc * bg_tc_loss
+    elif use_spatial_consistency or use_fg_temporal_consistency:
+        loss = loss_disp + instance_spatio_temp_loss
+    else:
+        loss = loss_disp
+    
+    loss_aux = loss
+
+    if use_bg_temporal_consistency:
+        loss_bg_tc_value = bg_tc_loss.item()
+    else:
+        loss_bg_tc_value = -1
+
+    if use_spatial_consistency or use_fg_temporal_consistency:
+        sc_loss_value = instance_spatial_loss_value
+        fg_tc_loss_value = instance_temporal_loss_value
+    else:
+        sc_loss_value = -1
+        fg_tc_loss_value = -1
+    
+    return loss_aux, loss_disp.item(), loss_bg_tc_value, sc_loss_value, fg_tc_loss_value
 
 def background_temporal_consistency_loss(disp_pred, pixel_cat_map_gt, non_empty_map, trans_matrices):
     """
-    disp_pred: Should be relative displacement between adjacent frames. shape (batch * 2, sweep_num, 2, h, w)
-    pixel_cat_map_gt: Shape (batch, 2, h, w, cat_num)
-    non_empty_map: Shape (batch, 2, h, w)
+    disp_pred: Should be relative displacement between adjacent frames. shape (batch * 2, sweep_num, 2, H, W)
+    pixel_cat_map_gt: Shape (batch, 2, H, W, cat_num)
+    non_empty_map: Shape (batch, 2, H, W)
     trans_matrices: Shape (batch, 2, sweep_num, 4, 4)
     """
     criterion = nn.SmoothL1Loss(reduction="sum")
@@ -761,7 +951,7 @@ def background_temporal_consistency_loss(disp_pred, pixel_cat_map_gt, non_empty_
     max_prob = np.amax(pixel_cat_maps, axis=-1)
     filter_mask = max_prob == 1.0
     pixel_cat_maps = np.argmax(pixel_cat_maps, axis=-1) + 1  # category starts from 1 (background), etc
-    pixel_cat_maps = pixel_cat_maps * non_empty_map_numpy * filter_mask  # (batch, 2, h, w)
+    pixel_cat_maps = pixel_cat_maps * non_empty_map_numpy * filter_mask  # (batch, 2, H, W)
 
     trans_matrices = trans_matrices.numpy()
     device = disp_pred.device
@@ -769,7 +959,7 @@ def background_temporal_consistency_loss(disp_pred, pixel_cat_map_gt, non_empty_
     pred_shape = disp_pred.size()
     disp_pred = disp_pred.view(-1, 2, pred_shape[1], pred_shape[2], pred_shape[3], pred_shape[4])
 
-    seq_1_pred = disp_pred[:, 0]  # (batch, sweep_num, 2, h, w)
+    seq_1_pred = disp_pred[:, 0]  # (batch, sweep_num, 2, H, W)
     seq_2_pred = disp_pred[:, 1]
 
     seq_1_absolute_pred_list = list()
@@ -831,14 +1021,14 @@ def background_temporal_consistency_loss(disp_pred, pixel_cat_map_gt, non_empty_
     for i in range(len(seq_1_absolute_pred_list)):
 
         # --- Start transformation for displacement field
-        curr_pred = seq_1_absolute_pred_list[i]  # (batch, 2, h, w)
+        curr_pred = seq_1_absolute_pred_list[i]  # (batch, 2, H, W)
 
         # First, rotation
-        curr_pred = curr_pred.permute(0, 2, 3, 1).contiguous()  # (batch, h, w, 2)
+        curr_pred = curr_pred.permute(0, 2, 3, 1).contiguous()  # (batch, H, W, 2)
         curr_pred = curr_pred.view(-1, h * w, 2)
         curr_pred = torch.bmm(curr_pred, disp_rotate_matrix)
-        curr_pred = curr_pred.view(-1, h, w, 2)
-        curr_pred = curr_pred.permute(0, 3, 1, 2).contiguous()  # (batch, 2, h, w)
+        curr_pred = curr_pred.view(-1, H, W, 2)
+        curr_pred = curr_pred.permute(0, 3, 1, 2).contiguous()  # (batch, 2, H, W)
 
         # Next, translation
         curr_pred = curr_pred.permute(0, 1, 3, 2).contiguous()  # swap x and y axis
@@ -856,10 +1046,10 @@ def background_temporal_consistency_loss(disp_pred, pixel_cat_map_gt, non_empty_
         transformed_disp_pred_list.append(curr_pred)
 
     # --- Start transformation for category map
-    pixel_cat_map = pixel_cat_maps[:, 0]  # (batch, h, w)
+    pixel_cat_map = pixel_cat_maps[:, 0]  # (batch, H, W)
     pixel_cat_map = torch.from_numpy(pixel_cat_map.astype(np.float32))
-    pixel_cat_map = pixel_cat_map[:, None, :, :]  # (batch, 1, h, w)
-    trans_pixel_cat_map = pixel_cat_map.permute(0, 1, 3, 2)  # (batch, 1, h, w), swap x and y axis
+    pixel_cat_map = pixel_cat_map[:, None, :, :]  # (batch, 1, H, W)
+    trans_pixel_cat_map = pixel_cat_map.permute(0, 1, 3, 2)  # (batch, 1, H, W), swap x and y axis
     trans_pixel_cat_map = torch.flip(trans_pixel_cat_map, dims=[2])
 
     grid = F.affine_grid(grid_trans_matrix, pixel_cat_map.size())
@@ -882,8 +1072,8 @@ def background_temporal_consistency_loss(disp_pred, pixel_cat_map_gt, non_empty_
 
     loss_list = list()
     for i in range(len(seq_1_absolute_pred_list)):
-        trans_seq_1_pred = transformed_disp_pred_list[i]  # (batch, 2, h, w)
-        seq_2_pred = seq_2_absolute_pred_list[i]  # (batch, 2, h, w)
+        trans_seq_1_pred = transformed_disp_pred_list[i]  # (batch, 2, H, W)
+        seq_2_pred = seq_2_absolute_pred_list[i]  # (batch, 2, H, W)
 
         trans_seq_1_pred = trans_seq_1_pred * mask_common
         seq_2_pred = seq_2_pred * mask_common
@@ -905,7 +1095,7 @@ def instance_spatial_temporal_consistency_loss(disp_pred, pixel_instance_map):
     pred_shape = disp_pred.size()
     disp_pred = disp_pred.view(-1, 2, pred_shape[1], pred_shape[2], pred_shape[3], pred_shape[4])
 
-    seq_1_pred = disp_pred[:, 0]  # (batch, sweep_num, 2, h, w)
+    seq_1_pred = disp_pred[:, 0]  # (batch, sweep_num, 2, H, W)
     seq_2_pred = disp_pred[:, 1]
 
     pixel_instance_map = pixel_instance_map.numpy()
@@ -926,7 +1116,7 @@ def instance_spatial_temporal_consistency_loss(disp_pred, pixel_instance_map):
 
         common_instance_ids = np.intersect1d(seq_1_instance_ids, seq_2_instance_ids, assume_unique=True)
 
-        seq_1_batch_pred = seq_1_pred[i]  # (sweep_num, 2, h, w)
+        seq_1_batch_pred = seq_1_pred[i]  # (sweep_num, 2, H, W)
         seq_2_batch_pred = seq_2_pred[i]
 
         for h in common_instance_ids:

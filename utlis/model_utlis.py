@@ -78,14 +78,20 @@ def noise_sample_ACGAN(batch_size=16, n_z=100, n_size=16):
 
     return z
 
-def calculate_gradient_penalty(model, real_images, fake_images, device):
+def calculate_gradient_penalty(model, real_images, fake_images, device, which_model=None, feat=None):
     """Calculates the gradient penalty loss for WGAN GP"""
     # Random weight term for interpolation between real and fake data
     alpha = torch.randn((real_images.size(0), 1, 1, 1), device=device)
     # Get random interpolation between real and fake data
     interpolates = (alpha * real_images + ((1 - alpha) * fake_images)).requires_grad_(True)
 
-    model_interpolates = model(interpolates)
+    # add new input
+    if which_model=="MotionNet":
+        interpolates = interpolates.view(interpolates.shape[0], 2, interpolates.shape[-2], interpolates.shape[-1])
+    if feat is not None:
+        model_interpolates = model(interpolates, feat)
+    else:
+        model_interpolates = model(interpolates)
     grad_outputs = torch.ones(model_interpolates[-1].size(), device=device, requires_grad=False)
 
     # Get gradient w.r.t. interpolates
@@ -97,7 +103,7 @@ def calculate_gradient_penalty(model, real_images, fake_images, device):
         retain_graph=True,
         only_inputs=True,
     )[0]
-    gradients = gradients.view(gradients.size(0), -1)
+    gradients = gradients.contiguous().view(gradients.size(0), -1)
     gradient_penalty = torch.mean((gradients.norm(2, dim=1) - 1) ** 2)
     return gradient_penalty
 
@@ -105,11 +111,53 @@ def reshape_disp(disp_pred, future_frames_num=20):
     """
     Reshape the displacement prediction to be used for warping.
     """
-    if disp_pred.shape[1] == 40:
-        disp_pred = disp_pred.view(disp_pred.shape[0], future_frames_num, disp_pred.shape[2], disp_pred.shape[3], 2).contiguous()
+    if disp_pred.shape[1] == future_frames_num * 2:
+        disp_pred = disp_pred.view(disp_pred.shape[0], future_frames_num, 2, disp_pred.shape[2], disp_pred.shape[3]).contiguous()
     # disp_pred = disp_pred.view(-1, future_frames_num, disp_pred.size(-3), disp_pred.size(-2), disp_pred.size(-1))
    
     for c in range(1, disp_pred.size(1)):
         disp_pred[:, c, ...] = disp_pred[:, c, ...] + disp_pred[:, c - 1, ...]
-    disp_pred = disp_pred.view(disp_pred.shape[0], -1, disp_pred.shape[2], disp_pred.shape[3])
+    # disp_pred = disp_pred.view(disp_pred.shape[0], -1, disp_pred.shape[2], disp_pred.shape[3])
+    disp_pred =disp_pred[:, -1, ...]
     return disp_pred
+
+def reshape_dispV2(disp_pred, valid_maps, future_frames_num=20, use_lastgt=False):
+    """
+    Reshape the displacement prediction to be used for warping.
+    Args:
+        -disp_pred: [bs, seq, 2, h, w]
+        -valid_map: [bs, seq, 1, h, w]
+    """
+    if disp_pred.shape[1] == future_frames_num * 2:
+        disp_pred = disp_pred.view(disp_pred.shape[0], future_frames_num, 2, disp_pred.shape[2], disp_pred.shape[3]).contiguous()
+    
+    for c in range(1, disp_pred.size(1)):
+        disp_pred[:, c, ...] = disp_pred[:, c, ...] + disp_pred[:, c - 1, ...]
+    # breakpoint()
+    disp_pred = disp_pred * valid_maps
+    disp_pred_clone = disp_pred
+    if use_lastgt:
+        disp_pred_clone = disp_pred_clone[:, -1, ...]
+    else:
+        disp_pred_clone = disp_pred_clone.view(disp_pred.size(0), -1, disp_pred.size(-2), disp_pred.size(-1))
+    return disp_pred_clone
+
+
+def reshape_dispV3(disp, valid_maps, future_frames_num=20, gt_flag = False):
+    """
+    Reshape the displacement labels to be used for warping.
+    """
+    # breakpoint()
+    if disp.shape[1] == future_frames_num * 2:
+        disp = disp.view(disp.shape[0], future_frames_num, 2, disp.shape[2], disp.shape[3]).contiguous()
+    
+    disp_warp = disp.clone()
+    if gt_flag:
+        for c in range(1, disp.size(1)):
+            disp_warp[:, c, ...] = disp[:, c, ...] - disp[:, c - 1, ...]
+        disp_warp = disp_warp * valid_maps
+    else:
+        disp_warp = disp_warp * valid_maps
+    
+    disp_warp = disp_warp.view(disp_warp.size(0), -1, disp_warp.size(-2), disp_warp.size(-1))
+    return disp_warp
