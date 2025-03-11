@@ -1,0 +1,15 @@
+# Copyright (C) 2020, 2023 Mitsubishi Electric Research Laboratories (MERL)
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+pyquaternion
+matplotlib
+seaborn
+numpy==1.24
+opencv-python
+tqdm
+torch
+Pillow
+nuscenes-devkit
+numba
+imageio

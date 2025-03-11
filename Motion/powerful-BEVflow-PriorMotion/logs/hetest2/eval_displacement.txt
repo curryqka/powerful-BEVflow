@@ -1,0 +1,99 @@
+--------------------------------------------------------------
+For cells within speed range [0.0, 0.0]:
+
+Frame 4:
+The mean error is 0.17271029949188232
+The 50% error quantile is 0.0
+Frame 8:
+The mean error is 0.19213618338108063
+The 50% error quantile is 0.0
+Frame 12:
+The mean error is 0.21305686235427856
+The 50% error quantile is 0.0
+Frame 16:
+The mean error is 0.23586486279964447
+The 50% error quantile is 0.0
+Frame 20:
+The mean error is 0.25845110416412354
+The 50% error quantile is 0.0
+--------------------------------------------------------------
+
+--------------------------------------------------------------
+For cells within speed range [0.0, 5.0]:
+
+Frame 4:
+The mean error is 0.4167287051677704
+The 50% error quantile is 0.02608968038111925
+Frame 8:
+The mean error is 0.5844851136207581
+The 50% error quantile is 0.05225598253309727
+Frame 12:
+The mean error is 0.7380198240280151
+The 50% error quantile is 0.07247956097126007
+Frame 16:
+The mean error is 0.8994492888450623
+The 50% error quantile is 0.0901443213224411
+Frame 20:
+The mean error is 1.0588901042938232
+The 50% error quantile is 0.10927552729845047
+--------------------------------------------------------------
+
+--------------------------------------------------------------
+For cells within speed range [5.0, 20.0]:
+
+Frame 4:
+The mean error is 1.8872361183166504
+The 50% error quantile is 1.5285028219223022
+Frame 8:
+The mean error is 3.4959802627563477
+The 50% error quantile is 3.0497336387634277
+Frame 12:
+The mean error is 5.113816261291504
+The 50% error quantile is 4.570105075836182
+Frame 16:
+The mean error is 6.740609645843506
+The 50% error quantile is 6.092849254608154
+Frame 20:
+The mean error is 8.364346504211426
+The 50% error quantile is 7.60777473449707
+--------------------------------------------------------------
+
+Mean pixel classification accuracy: 0.8406728866351352
+mean cat accuracy of Bg: 0.900243695846758
+mean cat accuracy of Vehicle: 0.028751817948498588
+mean cat accuracy of Ped: 0.01925104022191401
+mean cat accuracy of Bike: 0.0
+mean cat accuracy of Others: 0.07150284151863079
+mean instance acc: 0.20394987910716028
+
+Reshape the displacement prediction statistics into a column:
+0.17271029949188232
+0.19213618338108063
+0.21305686235427856
+0.23586486279964447
+0.25845110416412354
+0.0
+0.0
+0.0
+0.0
+0.0
+0.4167287051677704
+0.5844851136207581
+0.7380198240280151
+0.8994492888450623
+1.0588901042938232
+0.02608968038111925
+0.05225598253309727
+0.07247956097126007
+0.0901443213224411
+0.10927552729845047
+1.8872361183166504
+3.4959802627563477
+5.113816261291504
+6.740609645843506
+8.364346504211426
+1.5285028219223022
+3.0497336387634277
+4.570105075836182
+6.092849254608154
+7.60777473449707

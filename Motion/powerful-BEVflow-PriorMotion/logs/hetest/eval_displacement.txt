@@ -1,0 +1,61 @@
+--------------------------------------------------------------
+For cells within speed range [0.0, 0.0]:
+
+Frame 4:
+The mean error is 0.2953905463218689
+The 50% error quantile is 0.0
+Frame 8:
+The mean error is 0.29749682545661926
+The 50% error quantile is 0.0
+Frame 12:
+The mean error is 0.302766889333725
+The 50% error quantile is 0.0
+Frame 16:
+The mean error is 0.31057533621788025
+The 50% error quantile is 0.0
+Frame 20:
+The mean error is 0.3201291263103485
+The 50% error quantile is 0.0
+--------------------------------------------------------------
+
+--------------------------------------------------------------
+For cells within speed range [0.0, 5.0]:
+
+Frame 4:
+The mean error is 2.4510984420776367
+The 50% error quantile is 0.34933483600616455
+Frame 8:
+The mean error is 2.1455812454223633
+The 50% error quantile is 0.3833078444004059
+Frame 12:
+The mean error is 1.823862075805664
+The 50% error quantile is 0.37325797975063324
+Frame 16:
+The mean error is 1.510084867477417
+The 50% error quantile is 0.39429448544979095
+Frame 20:
+The mean error is 1.2048178911209106
+The 50% error quantile is 0.4840840846300125
+--------------------------------------------------------------
+
+--------------------------------------------------------------
+For cells within speed range [5.0, 20.0]:
+
+Frame 4:
+The mean error is 2.405716896057129
+The 50% error quantile is 1.234068512916565
+Frame 8:
+The mean error is 3.2793803215026855
+The 50% error quantile is 2.300370693206787
+Frame 12:
+The mean error is 4.2039031982421875
+The 50% error quantile is 3.465075731277466
+Frame 16:
+The mean error is 5.169785976409912
+The 50% error quantile is 4.575101852416992
+Frame 20:
+The mean error is 6.1779866218566895
+The 50% error quantile is 5.603221416473389
+--------------------------------------------------------------
+
+Mean pixel classification accuracy: 0.9332599587710725
