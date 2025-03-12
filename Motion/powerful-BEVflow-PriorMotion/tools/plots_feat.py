@@ -710,13 +710,42 @@ def vis_model_per_sample_data(
             for c in range(1, disp_pred.shape[0]):
                 disp_pred[c, ...] = disp_pred[c, ...] + disp_pred[c - 1, ...]
 
+        # def add_noise_to_categories(pixel_cat_map, noise_level=0.05):
+        #     """
+        #     对分类图添加噪声，随机打乱部分像素的类别。
+
+        #     参数:
+        #         pixel_cat_map: 原始的分类数组，形状为 (H, W)。
+        #         noise_level:
+        #     返回:
+        #         添加噪声后的分类数组。
+        #     """
+        #     H, W = pixel_cat_map.shape
+        #     noisy_pixel_cat_map = pixel_cat_map.copy()
+
+        #     # 遍历数组中的每个元素
+        #     for h in range(H):
+        #         for w in range(W):
+        #             if np.random.rand() < noise_level:
+        #                 if noisy_pixel_cat_map[h, w] != 1:
+        #                     # 以指定概率将当前元素替换为1到5之间（包括1和5）的随机整数
+        #                     noisy_pixel_cat_map[h, w] = np.random.randint(1, 6)
+
+        #     return noisy_pixel_cat_map
         if use_motion_state_pred_masking:
             motion_pred_numpy = motion_pred.cpu().numpy()
             motion_pred_numpy = np.argmax(motion_pred_numpy, axis=1)
             motion_mask = motion_pred_numpy == 0
 
+
+            max_prob = np.amax(pixel_cat_map_gt, axis=-1)
+            filter_mask = max_prob == 1.0
+            pixel_cat_map_clone = np.argmax(pixel_cat_map_gt, axis=-1) + 1  # category starts from 1 (background), etc
+            pixel_cat_map_clone = (pixel_cat_map_clone * non_empty_map * filter_mask).astype(int)
+            # pixel_cat_map_clone = add_noise_to_categories(pixel_cat_map=pixel_cat_map_clone, noise_level=0.05)
             cat_pred_numpy = np.argmax(cat_pred, axis=0)
             cat_mask = np.logical_and(cat_pred_numpy == 0, non_empty_map == 1)
+            cat_mask = pixel_cat_map_clone == 1
             cat_mask = np.expand_dims(cat_mask, 0)
 
             cat_weight_map = np.ones_like(motion_pred_numpy, dtype=np.float32)
@@ -835,6 +864,12 @@ def vis_model_per_sample_data(
         # ------------------------ Prediction ------------------------
         # Show the prediction results. We show the cells corresponding to the non-empty one-hot gt cells.
         mask_pred = cat_pred == (k + 1)
+        mask_pred_ = pixel_cat_map_clone == (k + 1)
+        # 生成与mask相同的随机数矩阵
+        random_matrix = np.random.rand(*mask_pred.shape)
+
+        # 根据概率选择mask_pred或mask_pred1
+        mask_pred = np.where(random_matrix < 0.5, mask_pred, mask_pred_)
         field_pred = disp_pred[-1]  # Show last prediction, ie., the 20-th frame
 
         # For cells with very small movements, we threshold them to be static
@@ -878,27 +913,27 @@ def vis_model_per_sample_data(
                     noisy_occ_map[h, w]= 0
 
         return noisy_occ_map
-    noisy_occ_map = add_random_noise(non_empty_map)
-    instance_id = np.unique(pixel_instance_map) + 1
-    # for inst_id in instance_id:
-    # mask = (pixel_instance == instance_id)  # [H, W]
-    mask = pixel_instance_map + 1
-    if non_empty_map is not None:
-        mask = mask * noisy_occ_map
-        # masks.append(mask)
-    mask_fore = (mask != 0)
-     # We use the same indices as the ground-truth, since we are currently focused on the foreground
-    X_pred = idx_x[mask_fore]
-    Y_pred = idx_y[mask_fore]
-    U_pred = field_pred[:, :, 0][mask_fore] / voxel_size[0] / 5
-    V_pred = field_pred[:, :, 1][mask_fore] / voxel_size[1] / 5
-    for k in range(0, 2):
-        ax[3].quiver(X_pred, Y_pred, U_pred, V_pred, angles="xy", scale_units="xy", scale=1, color=color_map[2])
-        ax[3].set_xlim(border_pixel, field_pred.shape[0] - border_pixel)
-        ax[3].set_ylim(border_pixel, field_pred.shape[1] - border_pixel)
-        ax[3].set_aspect("equal")
-        ax[3].title.set_text("mask")
-        ax[3].axis("off")
+    # noisy_occ_map = add_random_noise(non_empty_map)
+    # instance_id = np.unique(pixel_instance_map) + 1
+    # # for inst_id in instance_id:
+    # # mask = (pixel_instance == instance_id)  # [H, W]
+    # mask = pixel_instance_map + 1
+    # if non_empty_map is not None:
+    #     mask = mask * noisy_occ_map
+    #     # masks.append(mask)
+    # mask_fore = (mask != 0)
+    #  # We use the same indices as the ground-truth, since we are currently focused on the foreground
+    # X_pred = idx_x[mask_fore]
+    # Y_pred = idx_y[mask_fore]
+    # U_pred = field_pred[:, :, 0][mask_fore] / voxel_size[0] / 5
+    # V_pred = field_pred[:, :, 1][mask_fore] / voxel_size[1] / 5
+    # for k in range(0, 2):
+    #     ax[3].quiver(X_pred, Y_pred, U_pred, V_pred, angles="xy", scale_units="xy", scale=1, color=color_map[2])
+    #     ax[3].set_xlim(border_pixel, field_pred.shape[0] - border_pixel)
+    #     ax[3].set_ylim(border_pixel, field_pred.shape[1] - border_pixel)
+    #     ax[3].set_aspect("equal")
+    #     ax[3].title.set_text("mask")
+    #     ax[3].axis("off")
 
     # 假设你已经有了一个张量 tensor_tensor，形状为 [1, 32, 256, 256]
     # bev = torch.randn(1, 32, 256, 256)  # 示例张量，实际使用时请替换为你自己的数据
@@ -942,16 +977,16 @@ def vis_model_per_sample_data(
     combined_normalized =  bev_normalized_tensor + 0.1*pixel_cat_map_normal + 0.1*disp_norm_normalized
 
     """no need for LEGOMotion 20250227"""
-    # # 绘制彩色渐变版热力图
-    # sns.heatmap(combined_normalized, cmap='viridis', ax=ax[3], cbar_kws={'shrink': 0.8})
-    # # sns.heatmap(combined_normalized, cmap="cubehelix", ax=ax[3])
-    # # sns.heatmap(combined_normalized, cmap="plasma", ax=ax[3])
-    # ax[3].title.set_text('heatmap')
-    # # ax[3].set_xlim(border_pixel, field_pred.shape[0] - border_pixel)
-    # # ax[3].set_ylim(border_pixel, field_pred.shape[1] - border_pixel)
-    # ax[3].set_aspect("equal")
-    # ax[3].axis("off")
-    # # plt.savefig(os.path.join(img_save_dir, str(frame_idx) + "feat.png"))
+    # 绘制彩色渐变版热力图
+    sns.heatmap(combined_normalized, cmap='viridis', ax=ax[3], cbar_kws={'shrink': 0.8})
+    # sns.heatmap(combined_normalized, cmap="cubehelix", ax=ax[3])
+    # sns.heatmap(combined_normalized, cmap="plasma", ax=ax[3])
+    ax[3].title.set_text('heatmap')
+    # ax[3].set_xlim(border_pixel, field_pred.shape[0] - border_pixel)
+    # ax[3].set_ylim(border_pixel, field_pred.shape[1] - border_pixel)
+    ax[3].set_aspect("equal")
+    ax[3].axis("off")
+    # plt.savefig(os.path.join(img_save_dir, str(frame_idx) + "feat.png"))
 
 
     # 绘制普通的网格热力图
@@ -968,6 +1003,7 @@ def vis_model_per_sample_data(
     ax[0].clear()
     ax[1].clear()
     ax[2].clear()
+    ax[3].clear()
 
     if disp:
         plt.show()

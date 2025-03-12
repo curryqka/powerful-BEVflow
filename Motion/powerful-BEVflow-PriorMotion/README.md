@@ -4,11 +4,12 @@ Copyright (C) 2020, 2023 Mitsubishi Electric Research Laboratories (MERL)
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# MotionNet
+# PriorMotion
+## demo
+![demo](./asset/video/video_UniGridInsGRUMotionNetVAE_3/result.gif)
 
 ## Features
-
-MotionNet for Joint Perception and Motion Prediction for Autonomous Driving Based on Bird's Eye View Maps.
+PriorMotion: Generative Class-Agnostic Motion Prediction with Raster-Vector Motion Field Priors
 
 ## Installation
 - CUDA >= 9.0
