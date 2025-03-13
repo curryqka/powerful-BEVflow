@@ -5,36 +5,36 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
 # PriorMotion
-![overview](./asset/1motivation.pdf)
+![overview](./asset/1motivation.jpg)
 
 
 ## demo0
 ![demo](./asset/video/video_UniGridInsGRUMotionNetVAE_0/result.gif)
 
-## demo1
+<!-- ## demo1
 ![demo](./asset/video/video_UniGridInsGRUMotionNetVAE_1/result.gif)
 
 ## demo2
-![demo](./asset/video/video_UniGridInsGRUMotionNetVAE_2/result.gif)
+![demo](./asset/video/video_UniGridInsGRUMotionNetVAE_2/result.gif) -->
 
-## demo3
+## demo1
 ![demo](./asset/video/video_UniGridInsGRUMotionNetVAE_3/result.gif)
 
 ## Features
 PriorMotion: Generative Class-Agnostic Motion Prediction with Raster-Vector Motion Field Priors
 
 ## Installation
-- CUDA >= 9.0
+- CUDA >= 11.3
 - Python 3
 - pyquaternion, Matplotlib, PIL, numpy, cv2, tqdm (and other relevant packages which can be easily installed with pip or conda)
-- PyTorch >= 1.1
+- PyTorch >= 1.13
   - Note that, the MGDA-related code currently can only run on PyTorch 1.1 (due to the official implementation of [MGDA](https://github.com/intel-isl/MultiObjectiveOptimization)). Such codes include `min_norm_solvers.py`, `train_single_seq_MGDA.py` and `train_multi_seq_MGDA.py`.
 
 ### Setup:
 1. To run the code, first need to add the path to the root folder. For example:
 ```
-export PYTHONPATH=/home/pwu/PycharmProjects/MotionNet:$PYTHONPATH
-export PYTHONPATH=/home/pwu/PycharmProjects/MotionNet/nuscenes-devkit/python-sdk:$PYTHONPATH
+export PYTHONPATH=/path/to/your/MotionNet:$PYTHONPATH
+export PYTHONPATH=/path/to/your/MotionNet/nuscenes-devkit/python-sdk:$PYTHONPATH
 ```
 2. Data preparation (suppose we are now at the folder `MotionNet`):
    - Download the [nuScenes data](https://www.nuscenes.org/).
