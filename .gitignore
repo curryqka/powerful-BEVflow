@@ -1,0 +1,17 @@
+# 大文件区软链接，不入库
+/data
+/experiment
+/results
+
+# 上游是独立 git 克隆，重建方式见 docs/setup/upstream.md
+/third_party
+
+# python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# 本地杂项
+.DS_Store
+*_session_env/
