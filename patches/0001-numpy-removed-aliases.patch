@@ -1,0 +1,168 @@
+diff --git a/data/data_utils.py b/data/data_utils.py
+index 895d556..e813382 100644
+--- a/data/data_utils.py
++++ b/data/data_utils.py
+@@ -350,10 +350,10 @@ def gen_2d_grid_gt(
+     # Get the point cloud subsets, which are inside different instance bounding boxes
+     refer_box_list = list()
+     refer_pc_idx_per_bbox = list()
+-    points_category = np.zeros(refer_pc.shape[0], dtype=np.int)  # store the point categories
++    points_category = np.zeros(refer_pc.shape[0], dtype=int)  # store the point categories
+ 
+     pixel_instance_id = np.zeros(pixel_indices.shape[0], dtype=np.uint8)
+-    points_instance_id = np.zeros(refer_pc.shape[0], dtype=np.int)
++    points_instance_id = np.zeros(refer_pc.shape[0], dtype=int)
+ 
+     for i in range(num_instances):
+         instance_cat = instance_cat_list[i]
+@@ -491,7 +491,7 @@ def gen_2d_grid_gt(
+         disp_field = np.zeros([unique_indices.shape[0], 2], dtype=np.float32)  # we only consider the 2D field
+ 
+         # We only compute loss for valid pixels where there are corresponding box annotations between two frames
+-        valid_pixels = np.zeros(unique_indices.shape[0], dtype=np.bool)
++        valid_pixels = np.zeros(unique_indices.shape[0], dtype=bool)
+ 
+         for h, v in enumerate(zip(unique_indices, num_points_in_pixel)):
+ 
+@@ -951,7 +951,7 @@ def compute_ratio_cat_and_motion(
+         max_prob = np.amax(pixel_cat_map_gt, axis=-1)
+         filter_mask = max_prob == 1.0
+         pixel_cat_map = np.argmax(pixel_cat_map_gt, axis=-1) + 1  # category starts from 1 (background), etc
+-        pixel_cat_map = (pixel_cat_map * non_empty_map * filter_mask).astype(np.int)
++        pixel_cat_map = (pixel_cat_map * non_empty_map * filter_mask).astype(int)
+ 
+         for i in range(num_obj_cat):
+             curr_cat_mask = pixel_cat_map == (i + 1)
+@@ -960,7 +960,7 @@ def compute_ratio_cat_and_motion(
+ 
+         # -- Count the motion category number
+         motion_cat_map = np.argmax(motion_status_gt, axis=-1) + 1  # category starts from 1 (static), etc
+-        motion_cat_map = (motion_cat_map * non_empty_map * filter_mask).astype(np.int)
++        motion_cat_map = (motion_cat_map * non_empty_map * filter_mask).astype(int)
+ 
+         for i in range(num_motion_cat):
+             curr_motion_mask = motion_cat_map == (i + 1)
+diff --git a/data/gen_data.py b/data/gen_data.py
+index 3036e5f..f29e981 100644
+--- a/data/gen_data.py
++++ b/data/gen_data.py
+@@ -347,7 +347,7 @@ def convert_to_dense_bev(data_dict):
+ 
+     # Compile the batch of voxels, so that they can be fed into the network.
+     # Note that, the padded_voxel_points in this script will only be used for sanity check.
+-    padded_voxel_points = np.stack(padded_voxel_points_list, axis=0).astype(np.bool)
++    padded_voxel_points = np.stack(padded_voxel_points_list, axis=0).astype(bool)
+ 
+     # Finally, generate the ground-truth displacement field
+     # - all_disp_field_gt: the ground-truth displacement vectors for each grid cell
+@@ -403,7 +403,7 @@ def convert_to_sparse_bev(dense_bev_data):
+         save_trans_matrices,
+     ) = dense_bev_data
+ 
+-    save_valid_pixel_maps = save_valid_pixel_maps.astype(np.bool)
++    save_valid_pixel_maps = save_valid_pixel_maps.astype(bool)
+     save_voxel_dims = save_voxel_points.shape[1:]
+     num_categories = save_pixel_cat_maps.shape[-1]
+ 
+@@ -433,7 +433,7 @@ def convert_to_sparse_bev(dense_bev_data):
+     test_disp_field_gt[:, save_pixel_indices[:, 0], save_pixel_indices[:, 1], :] = sparse_disp_field_gt[:]
+     assert np.all(test_disp_field_gt == save_disp_field_gt), "Error: Mismatch"
+ 
+-    test_valid_pixel_maps = np.zeros((save_num_future_pcs, dims[0], dims[1]), dtype=np.bool)
++    test_valid_pixel_maps = np.zeros((save_num_future_pcs, dims[0], dims[1]), dtype=bool)
+     test_valid_pixel_maps[:, save_pixel_indices[:, 0], save_pixel_indices[:, 1]] = sparse_valid_pixel_maps[:]
+     assert np.all(test_valid_pixel_maps == save_valid_pixel_maps), "Error: Mismatch"
+ 
+@@ -451,7 +451,7 @@ def convert_to_sparse_bev(dense_bev_data):
+ 
+     for i in range(len(save_voxel_indices_list)):
+         indices = save_data_dict["voxel_indices_" + str(i)]
+-        curr_voxels = np.zeros(save_voxel_dims, dtype=np.bool)
++        curr_voxels = np.zeros(save_voxel_dims, dtype=bool)
+         curr_voxels[indices[:, 0], indices[:, 1], indices[:, 2]] = 1
+         assert np.all(curr_voxels == save_voxel_points[i]), "Error: Mismatch"
+ 
+diff --git a/data/nuscenes_dataloader.py b/data/nuscenes_dataloader.py
+index fd80be2..7bbf131 100644
+--- a/data/nuscenes_dataloader.py
++++ b/data/nuscenes_dataloader.py
+@@ -124,7 +124,7 @@ class TrainDatasetMultiSeq(Dataset):
+             num_past_pcs = self.num_past_frames
+             for i in range(num_past_pcs):
+                 indices = gt_dict["voxel_indices_" + str(i)]
+-                curr_voxels = np.zeros(dims, dtype=np.bool)
++                curr_voxels = np.zeros(dims, dtype=bool)
+                 curr_voxels[indices[:, 0], indices[:, 1], indices[:, 2]] = 1
+                 padded_voxel_points.append(curr_voxels)
+             padded_voxel_points = np.stack(padded_voxel_points, 0).astype(np.float32)
+@@ -266,7 +266,7 @@ class DatasetSingleSeq(Dataset):
+         padded_voxel_points = list()
+         for i in range(num_past_pcs):
+             indices = gt_dict["voxel_indices_" + str(i)]
+-            curr_voxels = np.zeros(dims, dtype=np.bool)
++            curr_voxels = np.zeros(dims, dtype=bool)
+             curr_voxels[indices[:, 0], indices[:, 1], indices[:, 2]] = 1
+             padded_voxel_points.append(curr_voxels)
+         padded_voxel_points = np.stack(padded_voxel_points, 0).astype(np.float32)
+diff --git a/eval.py b/eval.py
+index 185babb..cbb007d 100644
+--- a/eval.py
++++ b/eval.py
+@@ -220,7 +220,7 @@ def eval_motion_displacement(
+                 # Since in nuScenes (with 32-line LiDAR) the points (cells) in the distance are very sparse,
+                 # we evaluate the performance for cells within the range [-30m, 30m] along both x, y dimensions.
+                 border = 8
+-                roi_mask = np.zeros_like(curr_mask, dtype=np.bool)
++                roi_mask = np.zeros_like(curr_mask, dtype=bool)
+                 roi_mask[:, border:-border, border:-border] = True
+                 curr_mask = np.logical_and(curr_mask, roi_mask)
+ 
+@@ -242,11 +242,11 @@ def eval_motion_displacement(
+         max_prob = np.amax(pixel_cat_map_gt_numpy, axis=-1)
+         filter_mask = max_prob == 1.0  # Note: some of the cell probabilities are soft probabilities
+         pixel_cat_map_numpy = np.argmax(pixel_cat_map_gt_numpy, axis=-1) + 1  # category starts from 1 (background), etc
+-        pixel_cat_map_numpy = (pixel_cat_map_numpy * non_empty_map_numpy * filter_mask).astype(np.int)
++        pixel_cat_map_numpy = (pixel_cat_map_numpy * non_empty_map_numpy * filter_mask).astype(int)
+ 
+         class_pred_numpy = np.transpose(class_pred_numpy, (0, 2, 3, 1))
+         class_pred_numpy = np.argmax(class_pred_numpy, axis=-1) + 1
+-        class_pred_numpy = (class_pred_numpy * non_empty_map_numpy * filter_mask).astype(np.int)
++        class_pred_numpy = (class_pred_numpy * non_empty_map_numpy * filter_mask).astype(int)
+ 
+         border = 8
+         roi_mask = np.zeros_like(non_empty_map_numpy)
+diff --git a/plots.py b/plots.py
+index 0e7a41a..77d4fcd 100644
+--- a/plots.py
++++ b/plots.py
+@@ -400,7 +400,7 @@ def gen_2d_grid_gt_for_visualization(
+     # Get the point cloud subsets, which are inside different instance bounding boxes
+     refer_box_list = list()
+     refer_pc_idx_per_bbox = list()
+-    points_category = np.zeros(refer_pc.shape[0], dtype=np.int)  # store the point categories
++    points_category = np.zeros(refer_pc.shape[0], dtype=int)  # store the point categories
+ 
+     for i in range(num_instances):
+         instance_cat = instance_cat_list[i]
+@@ -492,7 +492,7 @@ def gen_2d_grid_gt_for_visualization(
+         disp_field = np.zeros([unique_indices.shape[0], 2], dtype=np.float32)  # we only consider the 2D field
+ 
+         # We only compute loss for valid pixels where there are corresponding box annotations between two frames
+-        valid_pixels = np.zeros(unique_indices.shape[0], dtype=np.bool)
++        valid_pixels = np.zeros(unique_indices.shape[0], dtype=bool)
+ 
+         for h, v in enumerate(zip(unique_indices, num_points_in_pixel)):
+ 
+@@ -680,10 +680,10 @@ def vis_model_per_sample_data(
+     max_prob = np.amax(pixel_cat_map_gt, axis=-1)
+     filter_mask = max_prob == 1.0
+     pixel_cat_map = np.argmax(pixel_cat_map_gt, axis=-1) + 1  # category starts from 1 (background), etc
+-    pixel_cat_map = (pixel_cat_map * non_empty_map * filter_mask).astype(np.int)
++    pixel_cat_map = (pixel_cat_map * non_empty_map * filter_mask).astype(int)
+ 
+     cat_pred = np.argmax(cat_pred, axis=0) + 1
+-    cat_pred = (cat_pred * non_empty_map * filter_mask).astype(np.int)
++    cat_pred = (cat_pred * non_empty_map * filter_mask).astype(int)
+ 
+     # --- Visualization ---
+     idx = num_past_pcs - 1
