@@ -205,7 +205,7 @@ def evaluate(
     oa = pixel_acc / len(dataset)
     overall_cls_gt = np.concatenate(overall_cls_gt)
     overall_cls_pred = np.concatenate(overall_cls_pred)
-    cm = confusion_matrix(overall_cls_gt, overall_cls_pred, labels=list(range(5)))
+    cm = confusion_matrix(overall_cls_gt, overall_cls_pred, labels=list(range(1, 6)))
     cm_sum = np.sum(cm, axis=1)
     with np.errstate(divide="ignore", invalid="ignore"):
         mean_cat = cm[np.arange(5), np.arange(5)] / cm_sum

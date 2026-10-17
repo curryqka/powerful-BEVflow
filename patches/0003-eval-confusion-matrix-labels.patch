@@ -1,5 +1,5 @@
 diff --git a/eval.py b/eval.py
-index 185babb..0cb00b0 100644
+index 185babb..662b94c 100644
 --- a/eval.py
 +++ b/eval.py
 @@ -220,7 +220,7 @@ def eval_motion_displacement(
@@ -30,7 +30,7 @@ index 185babb..0cb00b0 100644
      overall_cls_gt = np.concatenate(overall_cls_gt)
      overall_cls_pred = np.concatenate(overall_cls_pred)
 -    cm = confusion_matrix(overall_cls_gt, overall_cls_pred)
-+    cm = confusion_matrix(overall_cls_gt, overall_cls_pred, labels=list(range(5)))
++    cm = confusion_matrix(overall_cls_gt, overall_cls_pred, labels=list(range(1, 6)))
      cm_sum = np.sum(cm, axis=1)
      mean_cat = cm[np.arange(5), np.arange(5)] / cm_sum
      cat_map = {0: "Bg", 1: "Vehicle", 2: "Ped", 3: "Bike", 4: "Others"}
