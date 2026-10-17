@@ -1,0 +1,5 @@
+# R1A：验证管线。上游官方训练配方，不动。
+_base_: ../base.yaml
+
+run:
+  exp_id: R1A

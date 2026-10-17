@@ -1,10 +1,11 @@
 # 冒烟记录
 
-冒烟脚本：`scripts/smoke.sh`（上游模式）。重构后在同一脚本上增加新入口模式，检查项不变。
+冒烟脚本：`scripts/smoke.sh`，两种模式：`SMOKE_MODE=upstream`（上游脚本，重构前基线）与 `SMOKE_MODE=new`（bevflow 新入口，重构后），检查项完全相同。目录名带模式前缀。
 
 ## 通过记录
 
-- 2026-10-17 00:23，全项 PASS：`$RESULTS/_smoke/20261017_002303/`（S1，S2a 短训，S2b 过拟合，S3 存取，S4 评测，S5 可视化与数值检查）。
+- 2026-10-17 00:23，upstream 模式全项 PASS：`$RESULTS/_smoke/20261017_002303/`。
+- 2026-10-17 02:09 起，new 模式记录见下方（重构后入口：scripts/train.py，scripts/eval.py，scripts/viz.py，bevflow losses）。
 - 数据：mini 划分，seed 0 从 train split 抽 10 个场景（6/2/2），脚本 `scripts/make_mini_split.py`。本机无 nuScenes mini 原始数据，用 trainval 子集代替（决定记录在 `recon.md`）。
 
 ## 阈值调整（初始设定的修改）

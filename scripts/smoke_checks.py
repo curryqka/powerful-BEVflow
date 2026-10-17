@@ -12,6 +12,7 @@ import torch
 
 CODE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPSTREAM = os.path.join(CODE, "third_party", "MotionNet")
+sys.path.insert(0, CODE)
 sys.path.insert(0, UPSTREAM)
 sys.path.insert(0, os.path.join(UPSTREAM, "nuscenes-devkit", "python-sdk"))
 
@@ -76,33 +77,58 @@ def cmd_s1(args):
 
 
 def cmd_overfit(args):
-    sys.argv = ["train_multi_seq.py", "-d", args.train_root, "--batch", "1", "--nepoch", "1", "--nworker", "0"]
-    import train_multi_seq as tm
-
     dataset = _load_train_dataset(args.train_root)
     loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
     batch = next(iter(loader))
 
     device = torch.device("cuda")
-    model = torch.nn.DataParallel(
-        tm.MotionNet(out_seq_len=tm.out_seq_len, motion_category_num=2, height_feat_size=tm.height_feat_size)
-    ).to(device).train()
+    (padded, disp, valid, non_empty, cat, trans, motion_gt, inst, npf, nfu) = batch
+    padded = padded.view(-1, npf[0].item(), 256, 256, HEIGHT_FEAT).to(device)
+
+    if args.impl == "new":
+        from bevflow.models.losses import LossConfig, compute_losses
+        from bevflow.models.motionnet import MotionNet
+
+        model = torch.nn.DataParallel(
+            MotionNet(out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT)
+        ).to(device).train()
+        loss_cfg = LossConfig()
+
+        def one_step(optimizer, criterion):
+            disp_pred, class_pred, motion_pred = model(padded)
+            total, parts = compute_losses(
+                loss_cfg, disp, valid, cat, disp_pred, non_empty, class_pred,
+                motion_gt, motion_pred, trans, inst, device,
+            )
+            optimizer.zero_grad()
+            total.backward()
+            optimizer.step()
+            return parts
+    else:
+        sys.argv = ["train_multi_seq.py", "-d", args.train_root, "--batch", "1", "--nepoch", "1", "--nworker", "0"]
+        import train_multi_seq as tm
+
+        model = torch.nn.DataParallel(
+            tm.MotionNet(out_seq_len=tm.out_seq_len, motion_category_num=2, height_feat_size=tm.height_feat_size)
+        ).to(device).train()
+
+        def one_step(optimizer, criterion):
+            disp_pred, class_pred, motion_pred = model(padded)
+            out = tm.compute_and_bp_loss(
+                optimizer, device, nfu[0].item(),
+                disp, valid, cat, disp_pred, criterion, non_empty, class_pred,
+                motion_gt, motion_pred, trans, inst,
+            )
+            return out
+
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     criterion = torch.nn.SmoothL1Loss(reduction="none")
 
-    (padded, disp, valid, non_empty, cat, trans, motion_gt, inst, npf, nfu) = batch
-    padded = padded.view(-1, npf[0].item(), 256, 256, tm.height_feat_size).to(device)
-
     losses = []
     for step in range(args.steps):
-        disp_pred, class_pred, motion_pred = model(padded)
-        out = tm.compute_and_bp_loss(
-            optimizer, device, nfu[0].item(),
-            disp, valid, cat, disp_pred, criterion, non_empty, class_pred,
-            motion_gt, motion_pred, trans, inst,
-        )
-        assert out[0] is not None, "no valid pixels in the fixed batch"
-        losses.append(float(out[0]))
+        parts = one_step(optimizer, criterion)
+        assert parts[0] is not None, "no valid pixels in the fixed batch"
+        losses.append(float(parts[0]))
         if step % 50 == 0 or step == args.steps - 1:
             print(f"step {step}: loss_disp={losses[-1]:.6f}")
 
@@ -115,7 +141,7 @@ def cmd_overfit(args):
 
 
 def cmd_s3(args):
-    from model import MotionNet
+    from bevflow.models.motionnet import MotionNet
 
     device = torch.device("cuda")
     ckpt = torch.load(args.ckpt, map_location="cpu", weights_only=False)
@@ -135,9 +161,8 @@ def cmd_s3(args):
 
 
 def cmd_res(args):
-    sys.argv = ["train_multi_seq.py", "-d", args.train_root, "--batch", str(args.bs), "--nepoch", "1", "--nworker", "0"]
-    import train_multi_seq as tm
-    from model import MotionNet
+    from bevflow.models.losses import LossConfig, compute_losses
+    from bevflow.models.motionnet import MotionNet
 
     dataset = _load_train_dataset(args.train_root)
     loader = torch.utils.data.DataLoader(
@@ -149,6 +174,7 @@ def cmd_res(args):
     ).to(device).train()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     criterion = torch.nn.SmoothL1Loss(reduction="none")
+    loss_cfg = LossConfig()
 
     torch.cuda.reset_peak_memory_stats()
     it = iter(loader)
@@ -160,11 +186,13 @@ def cmd_res(args):
         (padded, disp, valid, non_empty, cat, trans, motion_gt, inst, npf, nfu) = batch
         padded = padded.view(-1, npf[0].item(), 256, 256, HEIGHT_FEAT).to(device)
         disp_pred, class_pred, motion_pred = model(padded)
-        tm.compute_and_bp_loss(
-            optimizer, device, nfu[0].item(),
-            disp, valid, cat, disp_pred, criterion, non_empty, class_pred,
-            motion_gt, motion_pred, trans, inst,
+        total, parts = compute_losses(
+            loss_cfg, disp, valid, cat, disp_pred, non_empty, class_pred,
+            motion_gt, motion_pred, trans, inst, device,
         )
+        optimizer.zero_grad()
+        total.backward()
+        optimizer.step()
         torch.cuda.synchronize()
         t1 = time.perf_counter()
         t_total += t1 - t0
@@ -190,6 +218,7 @@ def main():
     of = sub.add_parser("overfit")
     of.add_argument("--train-root", required=True)
     of.add_argument("--steps", type=int, default=200)
+    of.add_argument("--impl", default="upstream", choices=["upstream", "new"])
 
     s3 = sub.add_parser("s3")
     s3.add_argument("--ckpt", required=True)

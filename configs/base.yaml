@@ -1,0 +1,41 @@
+# 基线配置 = 上游官方训练配方（README 命令：bs8, 45 epoch, 三个一致性损失全开）。
+# R1A 直接用；R1B 只改预算。路径缺省值见 bevflow/utils/paths.py。
+run:
+  exp_id: R0
+  run_id: ""          # 必填，如 20261017_R1A_motionnet_s0
+
+data:
+  train_root: /media/nas_users/kaneqian/data/bevflow/preprocessed/motionnet_v1/train
+  val_root: /media/nas_users/kaneqian/data/bevflow/preprocessed/motionnet_v1/val
+  data_version: motionnet_v1
+
+model:
+  name: motionnet
+  out_seq_len: 20
+  motion_category_num: 2
+  height_feat_size: 13
+
+optim:
+  lr: 0.0016
+  milestones: [10, 20, 30, 40]   # MultiStepLR gamma 0.5
+
+train:
+  epochs: 45
+  batch_size: 8
+  workers: 4
+  seed: 0
+  resume: auto
+  val_interval: 5      # 每 5 个 epoch 做一次 val（上游不跑 val；此为新增机制）
+  val_batch_size: 4
+
+loss:                  # = 上游 README 官方配方
+  use_bg_tc: true
+  use_fg_tc: true
+  use_sc: true
+  nn_sampling: false
+  reg_weight_bg_tc: 0.1
+  reg_weight_fg_tc: 2.5
+  reg_weight_sc: 15.0
+
+log:
+  interval: 50

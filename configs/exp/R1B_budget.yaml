@@ -1,0 +1,9 @@
+# R1B：项目统一预算。与 R1A 唯一区别是 batch size（46GB 卡 bs4 直接放得下，无需梯度累积）。
+# R1B 之后所有新方法共用此预算。
+_base_: ../base.yaml
+
+run:
+  exp_id: R1B
+
+train:
+  batch_size: 4

@@ -1,0 +1,22 @@
+# 新结构冒烟：mini 数据，2 epoch，无一致性损失（与上游模式冒烟同设置，便于对拍）。
+_base_: ../base.yaml
+
+run:
+  exp_id: SMOKE
+
+data:
+  train_root: /media/nas_users/kaneqian/data/bevflow/preprocessed/mini/train
+  val_root: /media/nas_users/kaneqian/data/bevflow/preprocessed/mini/val
+  data_version: mini
+
+train:
+  epochs: 2
+  batch_size: 4
+  workers: 2
+  val_interval: 2
+  val_batch_size: 4
+
+loss:
+  use_bg_tc: false
+  use_fg_tc: false
+  use_sc: false
