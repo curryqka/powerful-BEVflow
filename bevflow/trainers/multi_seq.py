@@ -93,8 +93,25 @@ def train(cfg, run_dir):
     with open(os.path.join(run_dir, "run_manifest.json"), "w") as f:
         json.dump(manifest, f, indent=1)
 
+    from scripts.registry import append as _registry_append
+
+    _registry_append({
+        "run_id": manifest["run_id"], "exp_id": cfg["run"].get("exp_id", ""), "seed": seed,
+        "status": "running", "config": cfg.get("_config_path", ""),
+        "exp_path": run_dir,
+    })
+
     # -- 数据
-    from bevflow.datasets.motionnet import TrainDatasetMultiSeq
+    from bevflow.datasets.motionnet import AREA_EXTENTS, VOXEL_SIZE, TrainDatasetMultiSeq
+
+    card_path = os.path.join(os.path.dirname(cfg["data"]["train_root"]), "data_card.json")
+    if os.path.exists(card_path):
+        with open(card_path) as f:
+            card = json.load(f)
+        p = card["params"]
+        assert list(p["voxel_size"]) == list(VOXEL_SIZE), f"data card voxel mismatch: {p['voxel_size']}"
+        assert p["height_bins"] == HEIGHT_FEAT and p["past_frames"] == 5 and p["future_frames"] == 20
+        assert p["range_xy"] == [AREA_EXTENTS[0][0], AREA_EXTENTS[0][1]], "data card range mismatch"
 
     trainset = TrainDatasetMultiSeq(
         dataset_root=cfg["data"]["train_root"],
@@ -234,6 +251,11 @@ def train(cfg, run_dir):
     manifest["wall_seconds"] = round(time.time() - t_start, 1)
     with open(os.path.join(run_dir, "run_manifest.json"), "w") as f:
         json.dump(manifest, f, indent=1)
+    _registry_append({
+        "run_id": manifest["run_id"], "exp_id": cfg["run"].get("exp_id", ""), "seed": seed,
+        "status": "done", "config": cfg.get("_config_path", ""),
+        "exp_path": run_dir, "note": f"wall {manifest['wall_seconds']}s",
+    })
     if tb is not None:
         tb.close()
     return run_dir

@@ -1,0 +1,9 @@
+# 实验登记（自动生成，不手改）
+
+由 scripts/registry.py --md 生成。
+
+| run_id | exp_id | seed | status | epe static/slow/fast | exp 路径 |
+|---|---|---|---|---|---|
+| 20261017_R1B_motionnet_s0 | R1B | 0 | running | -/-/- | /media/nas_users/kaneqian/Experiment/bevflow/R1B/20261017_R1B_motionnet_s0 |
+| official_test_bs1 | EVAL | None | running | -/-/- | /media/nas_users/kaneqian/Experiment/bevflow/_models/motionnet_official |
+| 20261017_R1A_motionnet_s0 | R1A | 0 | running | -/-/- | /media/nas_users/kaneqian/Experiment/bevflow/R1A/20261017_R1A_motionnet_s0 |

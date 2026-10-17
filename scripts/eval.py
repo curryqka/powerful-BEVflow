@@ -33,6 +33,7 @@ def main():
     args = parser.parse_args()
 
     from bevflow.evaluators.motion_eval import evaluate
+    from scripts.registry import append as registry_append
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = load_model(args.ckpt, device)
@@ -41,6 +42,13 @@ def main():
         batch_size=args.bs, num_workers=args.worker, device=device,
         run_id=args.run_id, ckpt_path=args.ckpt,
     )
+    registry_append({
+        "run_id": args.run_id or f"eval_{os.path.basename(args.ckpt)}",
+        "exp_id": "EVAL", "seed": None, "status": "done",
+        "ckpt": args.ckpt, "results_path": args.out_dir,
+        "epe": {k: v["mean"] for k, v in metrics["epe"].items()},
+        "note": f"split={args.split} bs={args.bs} OA={metrics['cls']['OA']}",
+    })
     print("OA:", metrics["cls"]["OA"], "MCA:", metrics["cls"]["MCA"])
     for tier, v in metrics["epe"].items():
         print(f"epe {tier}: mean={v['mean']}")
