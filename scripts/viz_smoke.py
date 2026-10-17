@@ -1,6 +1,7 @@
-"""冒烟可视化：固定 4 个 val 样本，各出 GT / 预测 / 误差 / 静态误差 四张 PNG。
+"""冒烟可视化：固定 4 个 val 样本，风格对齐上游 plots.py。
 
-颜色编码：HSV 流场图，角度=色相，幅值/上限=明度，固定色轮与色标。
+每个样本四张 PNG：GT quiver，预测 quiver（类别着色，同 plots.py），|pred-gt| 误差图，
+GT 静态格子上的预测幅值（静态噪点图）。后两张是 plots.py 没有的补充面板。
 """
 import argparse
 import json
@@ -14,7 +15,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from matplotlib.colors import hsv_to_rgb
 
 CODE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPSTREAM = os.path.join(CODE, "third_party", "MotionNet")
@@ -25,15 +25,30 @@ HEIGHT_FEAT = 13
 FUTURE_FRAMES = 20
 STATIC_THD_PER_FRAME = 0.01  # 0.2 m/s * (1/20) s，与 eval.py 一致
 
+# 与 plots.py 一致
+COLOR_MAP = {0: "c", 1: "m", 2: "k", 3: "y", 4: "r"}
+CAT_NAMES = {0: "bg", 1: "bus", 2: "ped", 3: "bike", 4: "other"}
+BORDER_METER = 4
+VOXEL_XY = 0.25
+DISP_DISPLAY_THD = 0.4  # plots.py：小于该幅值（米）的位移箭头归零显示
 
-def flow_to_rgb(flow, max_mag, valid):
-    mag = np.linalg.norm(flow, axis=-1)
-    ang = np.arctan2(flow[..., 1], flow[..., 0])
-    hue = (ang + np.pi) / (2 * np.pi)
-    val = 0.15 + 0.85 * np.clip(mag / max_mag, 0, 1)
-    rgb = hsv_to_rgb(np.stack([hue, np.full_like(hue, 0.9), val], axis=-1))
-    rgb[~valid] = 0.92
-    return rgb
+
+def quiver_panel(ax, field, cat_map_int, k, title):
+    idx = np.arange(field.shape[0])
+    idx_x, idx_y = np.meshgrid(idx, idx, indexing="ij")
+    mask = cat_map_int == (k + 1)
+    q = ax.quiver(
+        idx_x[mask], idx_y[mask],
+        field[..., 0][mask] / VOXEL_XY, field[..., 1][mask] / VOXEL_XY,
+        angles="xy", scale_units="xy", scale=1, color=COLOR_MAP[k],
+    )
+    ax.quiverkey(q, X=0.0 + k / 5.0, Y=1.1, U=20, label=CAT_NAMES[k], labelpos="E")
+    b = int(BORDER_METER / VOXEL_XY)
+    ax.set_xlim(b, field.shape[0] - b)
+    ax.set_ylim(b, field.shape[1] - b)
+    ax.set_aspect("equal")
+    ax.set_title(title, fontsize=9)
+    ax.axis("off")
 
 
 def main():
@@ -65,77 +80,68 @@ def main():
     model.load_state_dict(torch.load(args.ckpt, map_location="cpu", weights_only=False)["model_state_dict"])
     model = model.to(device).eval()
 
-    gts, preds = [], []
-    for idx in idxs:
+    manifest = {"style": "plots.py quiver, category colors c/m/k/y/r", "val_root": args.val_root,
+                "ckpt": args.ckpt, "seed": args.seed, "idxs": idxs, "future_row": FUTURE_FRAMES - 1,
+                "git": subprocess.run(["git", "rev-parse", "HEAD"], cwd=CODE,
+                                      capture_output=True, text=True).stdout.strip(),
+                "samples": []}
+
+    for i, idx in enumerate(idxs):
         padded, disp, valid, non_empty, cat, past, future, motion = dataset[idx]
+
         x = torch.from_numpy(padded).unsqueeze(0).to(device)
         with torch.no_grad():
-            disp_pred, _, _ = model(x)
+            disp_pred, cell_pred, _ = model(x)
         disp_pred = disp_pred.view(1, -1, 256, 256, 2).cpu().numpy()
         for c in range(1, disp_pred.shape[1]):
             disp_pred[:, c] += disp_pred[:, c - 1]
-        gt = disp[-1]          # (256,256,2) 第 20 帧 = 1.0s
         pred = disp_pred[0, -1]
-        gts.append((gt, non_empty, disp))
-        preds.append(pred)
+        cat_pred = torch.argmax(cell_pred[0], dim=0).cpu().numpy() + 1
 
-    max_mag = max(float(np.linalg.norm(g, axis=-1).max()) for g, _, _ in gts)
-    max_mag = float(np.ceil(max_mag * 2) / 2)
-    max_err = max(float(np.linalg.norm(p - g, axis=-1).max()) for (g, _, _), p in zip(gts, preds))
+        gt = disp[-1]
+        one_hot = cat.max(-1) == 1.0
+        gt_cat = (np.argmax(cat, -1) + 1) * non_empty * one_hot
+        pred_cat = cat_pred * non_empty * one_hot
 
-    manifest = {"val_root": args.val_root, "ckpt": args.ckpt, "seed": args.seed,
-                "idxs": idxs, "future_row": FUTURE_FRAMES - 1, "max_mag_gt": max_mag,
-                "max_err": max_err, "git": subprocess.run(
-                    ["git", "rev-parse", "HEAD"], cwd=CODE, capture_output=True, text=True
-                ).stdout.strip(),
-                "samples": []}
+        display_gt = gt.copy()
+        display_gt[np.linalg.norm(gt, axis=-1) <= DISP_DISPLAY_THD] = 0
+        display_pred = pred.copy()
+        display_pred[np.linalg.norm(pred, axis=-1) <= DISP_DISPLAY_THD] = 0
 
-    for i, (idx, (gt, non_empty, disp_all), pred) in enumerate(zip(idxs, gts, preds)):
-        valid = non_empty > 0
         err = np.linalg.norm(pred - gt, axis=-1)
-        gt_norm_all = np.linalg.norm(disp_all, axis=-1)      # (20,256,256)
-        static = (gt_norm_all <= STATIC_THD_PER_FRAME).all(axis=0) & valid
+        err[non_empty == 0] = np.nan
+        gt_norm_all = np.linalg.norm(disp, axis=-1)
+        static = (gt_norm_all <= STATIC_THD_PER_FRAME).all(axis=0) & (non_empty > 0)
+        static_noise = np.where(static, np.linalg.norm(pred, axis=-1), np.nan)
 
-        panels = [
-            ("gt", flow_to_rgb(gt, max_mag, valid), "GT flow (1.0s)"),
-            ("pred", flow_to_rgb(pred, max_mag, valid), "Pred flow (1.0s)"),
-        ]
-        for tag, img, title in panels:
-            fig, ax = plt.subplots(figsize=(4, 4), dpi=192)
-            ax.imshow(img, interpolation="nearest")
-            ax.set_title(title, fontsize=9)
-            ax.axis("off")
-            sm = plt.cm.ScalarMappable(matplotlib.colors.Normalize(0, max_mag), plt.cm.hsv)
-            fig.colorbar(sm, ax=ax, fraction=0.046, label="|flow| m")
-            f = os.path.join(args.out_dir, f"{i:02d}_idx{idx}_{tag}.png")
-            fig.savefig(f, bbox_inches="tight")
-            plt.close(fig)
+        fig, axes = plt.subplots(1, 2, figsize=(11, 5.5), dpi=192)
+        for k in range(5):
+            quiver_panel(axes[0], display_gt, gt_cat, k, "Ground-truth (1.0s)")
+            quiver_panel(axes[1], display_pred, pred_cat, k, "Prediction (1.0s)")
+        fig.savefig(os.path.join(args.out_dir, f"{i:02d}_idx{idx}_quiver.png"), bbox_inches="tight")
+        plt.close(fig)
 
-        fig, ax = plt.subplots(figsize=(4, 4), dpi=192)
-        im = ax.imshow(err, cmap="magma", vmin=0, vmax=max_err, interpolation="nearest")
+        fig, ax = plt.subplots(figsize=(4.6, 4.2), dpi=192)
+        im = ax.imshow(err, cmap="magma", vmin=0, interpolation="nearest")
         ax.set_title("|pred-gt| (1.0s)", fontsize=9)
         ax.axis("off")
         fig.colorbar(im, ax=ax, fraction=0.046, label="m")
-        f = os.path.join(args.out_dir, f"{i:02d}_idx{idx}_err.png")
-        fig.savefig(f, bbox_inches="tight")
+        fig.savefig(os.path.join(args.out_dir, f"{i:02d}_idx{idx}_err.png"), bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = plt.subplots(figsize=(4, 4), dpi=192)
-        pred_mag = np.linalg.norm(pred, axis=-1)
-        m = np.where(static, pred_mag, np.nan)
-        im = ax.imshow(m, cmap="viridis", vmin=0, vmax=np.nanmax(m) if np.isfinite(np.nanmax(m)) else 1,
-                       interpolation="nearest")
+        fig, ax = plt.subplots(figsize=(4.6, 4.2), dpi=192)
+        vmax = np.nanmax(static_noise)
+        im = ax.imshow(static_noise, cmap="viridis", vmin=0,
+                       vmax=vmax if np.isfinite(vmax) and vmax > 0 else 1, interpolation="nearest")
         ax.set_title("pred |flow| on GT-static cells", fontsize=9)
         ax.axis("off")
         fig.colorbar(im, ax=ax, fraction=0.046, label="m")
-        f = os.path.join(args.out_dir, f"{i:02d}_idx{idx}_staticerr.png")
-        fig.savefig(f, bbox_inches="tight")
+        fig.savefig(os.path.join(args.out_dir, f"{i:02d}_idx{idx}_staticerr.png"), bbox_inches="tight")
         plt.close(fig)
 
         manifest["samples"].append({
             "idx": int(idx),
-            "gt": f"{i:02d}_idx{idx}_gt.png",
-            "pred": f"{i:02d}_idx{idx}_pred.png",
+            "quiver": f"{i:02d}_idx{idx}_quiver.png",
             "err": f"{i:02d}_idx{idx}_err.png",
             "staticerr": f"{i:02d}_idx{idx}_staticerr.png",
         })

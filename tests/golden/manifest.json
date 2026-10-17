@@ -1,0 +1,12 @@
+{
+ "forward.npz": {
+  "sha256": "3281b6a4d3c09b4f640c0810a3d744bdf86c3d5fce8300feae7b572e45c9f758",
+  "size": 54160986
+ },
+ "loss.json": {
+  "sha256": "a7a03be87cfe79d0c2b0025c879b6899cbf6f2b333255bc882791740bd8e0360",
+  "size": 113
+ },
+ "preprocess_ref": "/media/nas_users/kaneqian/data/bevflow/preprocessed/mini/train/116_0",
+ "eval_ref": "/media/nas_users/kaneqian/results/bevflow/_smoke/20261017_002303/eval/metrics.json"
+}
