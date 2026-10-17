@@ -1,0 +1,13 @@
+diff --git a/train_multi_seq.py b/train_multi_seq.py
+index 4bf6ee3..266b858 100644
+--- a/train_multi_seq.py
++++ b/train_multi_seq.py
+@@ -379,7 +379,7 @@ def compute_and_bp_loss(
+         map_shape = cat_weight_map.size()
+ 
+         loss_disp = criterion(gt * valid_pixel_maps, disp_pred * valid_pixel_maps)
+-        loss_disp = loss_disp.view(map_shape[0], -1, map_shape[-3], map_shape[-2], map_shape[-1])
++        loss_disp = loss_disp.reshape(map_shape[0], -1, map_shape[-3], map_shape[-2], map_shape[-1])
+         loss_disp = torch.sum(loss_disp * cat_weight_map) / valid_pixel_num
+     else:
+         loss_disp = criterion(gt * valid_pixel_maps, disp_pred * valid_pixel_maps) / valid_pixel_num
