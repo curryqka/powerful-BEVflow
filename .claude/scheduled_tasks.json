@@ -11,16 +11,6 @@
       "createdByPid": 374830,
       "createdByProcStart": "15402843",
       "createdInProject": "/home/kaneqian/BEVflow"
-    },
-    {
-      "id": "ce3026cd",
-      "cron": "23 1 18 10 *",
-      "prompt": "BEVflow 一次性检查（非 12 小时例行）：确认 R1A s1 的 fast epe 是否在下降通道。1) 读 /media/nas_users/kaneqian/Experiment/bevflow/R1A/20261017_R1A_motionnet_s1/logs/train.jsonl 中带 val 的 epoch 行，比较 epoch 5（fast=3.2677）与 epoch 10（或最新带 val 的 epoch）的 fast/static；2) 若 fast 明显下降（如 <2）→ 趋势健康，一句话汇报即可；3) 若 fast 停滞或上升（≥3.27）→ 汇报\"R1A s1 虽未落入零解但收敛异常缓慢\"，连同 R1A 处置三选项（argparse 默认=一致性关 / 降一致性权重 / 并入 bs4 预算）请用户拍板，训练先不停；4) 顺带读 /tmp/upstream_bs8_1ep/train_multi_seq/2026-10-17_21-14-19/epoch_5.pth 的 |disp|（用 bevflow.models.loader 在 GPU1 上测 4 个 val 样本），对照 my trainer 的 0.0189——完成上游训练器仲裁，结果计入汇报。",
-      "createdAt": 1792280879282,
-      "createdBySessionId": "4e7a24de-30f1-465c-8c4e-1159f733500a",
-      "createdByPid": 374830,
-      "createdByProcStart": "15402843",
-      "createdInProject": "/home/kaneqian/BEVflow"
     }
   ]
 }

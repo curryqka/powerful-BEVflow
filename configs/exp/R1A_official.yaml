@@ -1,15 +1,11 @@
-# R1A：验证管线。上游 argparse 默认配方 = 一致性损失全关（2026-10-18 用户拍板重定义）。
-# 原因：README 的官方命令（一致性全开，bs8）在我们的栈上（torch 2.14 + 本数据顺序）
-# 两个种子均滑向零解（上游原生训练器同栈复现），详见 docs/reports/R1.md 的塌缩调查。
-# argparse 默认是上游 README 的另一种合理读法：README:35 写明 train_single_seq.py
-# "train MotionNet exactly in the same manner, except without utilizing spatio-temporal
-# consistency losses"，一致性开与否本就是上游提供的两种官方方式。
+# R1A：验证管线。上游 README:31 官方配方原样（一致性损失全开，bs8，45 epoch）。
+#
+# 2026-10-18 用户拍板：维持旧定义。此前一天的塌缩调查结论：bs8 + 一致性全开在
+# 我们的栈上（torch 2.14 + 本数据顺序）有种子依赖的零解风险——种子 0 塌缩
+# （位移头输出衰减 0.10→0.002，上游原生训练器同栈复现该轨迹），种子 1 健康收敛
+# （fast 3.27→0.61，与 R1B 同档）。官方 R1A 结果 = 种子 1 的 run
+# （20261017_R1A_motionnet_s1）；塌缩机制调查见 docs/reports/R1.md。
 _base_: ../base.yaml
 
 run:
   exp_id: R1A
-
-loss:
-  use_bg_tc: false
-  use_fg_tc: false
-  use_sc: false
