@@ -7,7 +7,11 @@
 | official_test_bs1 | EVAL | None | done | 0.014465710148215294/0.14758802577853203/0.5932264178991318 | - |
 | 20261017_R1B_motionnet_s0 | R1B | 0 | done | -/-/- | /media/nas_users/kaneqian/Experiment/bevflow/R1B/20261017_R1B_motionnet_s0 |
 | 20261017_R1A_motionnet_s0 | R1A | 0 | done | -/-/- | /media/nas_users/kaneqian/Experiment/bevflow/R1A/20261017_R1A_motionnet_s0 |
-| 20261017_R1A_motionnet_s1 | R1A | 1 | running | -/-/- | /media/nas_users/kaneqian/Experiment/bevflow/R1A/20261017_R1A_motionnet_s1 |
-| 20261017_R1B_motionnet_s2 | R1B | 2 | running | -/-/- | /media/nas_users/kaneqian/Experiment/bevflow/R1B/20261017_R1B_motionnet_s2 |
 | 20261017_R1B_motionnet_s1 | R1B | 1 | done | -/-/- | /media/nas_users/kaneqian/Experiment/bevflow/R1B/20261017_R1B_motionnet_s1 |
 | 20261018_R1A_official_s0 | R1A | 0 | failed | -/-/- | /media/nas_users/kaneqian/Experiment/bevflow/R1A/20261018_R1A_official_s0 |
+| 20261017_R1A_motionnet_s1 | R1A | 1 | done | -/-/- | /media/nas_users/kaneqian/Experiment/bevflow/R1A/20261017_R1A_motionnet_s1 |
+| R1B_s0_ep45_test | EVAL | None | done | 0.01445464240387082/0.14807938560843467/0.6007417887449265 | - |
+| R1B_s1_ep45_test | EVAL | None | done | 0.014185045287013054/0.15070005282759666/0.628970381617546 | - |
+| R1A_s1_ep45_test | EVAL | None | done | 0.013705669995397329/0.15535586401820184/0.6747722834348678 | - |
+| 20261017_R1B_motionnet_s2 | R1B | 2 | done | -/-/- | /media/nas_users/kaneqian/Experiment/bevflow/R1B/20261017_R1B_motionnet_s2 |
+| R1B_s2_ep45_test | EVAL | None | done | 0.015167945995926857/0.16157103478908538/0.6818280518054962 | - |
