@@ -12,7 +12,10 @@ import numpy as np
 import torch
 
 CODE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+UPSTREAM = os.path.join(CODE, "third_party", "MotionNet")
 sys.path.insert(0, CODE)
+sys.path.insert(0, UPSTREAM)
+sys.path.insert(0, os.path.join(UPSTREAM, "nuscenes-devkit", "python-sdk"))
 
 from bevflow.evaluators.motion_eval import evaluate  # noqa: E402
 from bevflow.models.loader import load_motionnet  # noqa: E402
