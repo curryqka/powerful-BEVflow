@@ -57,11 +57,20 @@ def visualize_samples(model, dataset, idxs, out_dir, seed=0, ckpt=""):
         x = torch.from_numpy(np.asarray(padded)).unsqueeze(0).to(device)
         with torch.no_grad():
             disp_pred, cell_pred, _ = model(x)
-        disp_pred = disp_pred.view(1, -1, 256, 256, 2).cpu().numpy()
-        for c in range(1, disp_pred.shape[1]):
-            disp_pred[:, c] += disp_pred[:, c - 1]
-        pred = disp_pred[0, -1]
+        # 模型原始输出 (B*F, 2, h, w)，与 plots.py 相同的解析：帧维提到最前，通道转到最后
+        disp_pred = disp_pred.view(1, -1, 2, 256, 256)[0].cpu().numpy()   # (F, 2, h, w)
+        disp_pred = np.transpose(disp_pred, (0, 2, 3, 1))                 # (F, h, w, 2)
+        for c in range(1, disp_pred.shape[0]):
+            disp_pred[c] += disp_pred[c - 1]
+        pred = disp_pred[-1]
         cat_pred = torch.argmax(cell_pred[0], dim=0).cpu().numpy() + 1
+
+        gt_magnitude = float(np.linalg.norm(disp[-1], axis=-1).mean())
+        pred_magnitude = float(np.linalg.norm(pred, axis=-1).mean())
+        assert pred_magnitude < max(5.0, 3 * gt_magnitude + 0.5), (
+            f"predicted flow magnitude {pred_magnitude:.3f} implausible vs GT {gt_magnitude:.3f} "
+            "(layout bug?)"
+        )
 
         gt = disp[-1]
         one_hot = cat.max(-1) == 1.0
