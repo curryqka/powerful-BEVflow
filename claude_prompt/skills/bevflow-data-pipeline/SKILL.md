@@ -9,17 +9,20 @@ description: 处理 BEVflow 的数据时使用。覆盖原始 nuScenes 的软链
 
 # 一、原始数据只链接
 
-原始路径已定：`$RAW_NUSCENES`，即 `/media/nas_users/kaneqian/data/Nuscences`（总控提示词第 0 节）。
-
-1. 确认有 `v1.0-trainval` 元数据，以及 `samples`，`sweeps`。
-2. 建链接 `$DATA/raw/nuscenes -> $RAW_NUSCENES`，只读使用。
-3. 路径失效时再浅层找，深度不超过 3。找不到，问我。不要全盘搜索 NAS。
+1. 找原始 nuScenes：先看环境变量与 `docs/setup/recon.md`，再看 `$NAS/data` 的一级目录名，最后在常见位置浅层找，深度不超过 3。
+2. 确认有 `v1.0-trainval` 或 `v1.0-mini` 元数据，以及 `samples`，`sweeps`。
+3. 建链接 `$DATA/raw/nuscenes -> <原始路径>`，只读使用。
+4. 找不到，问我。不要全盘搜索 NAS。
 
 # 二、划分
 
-直接用上游 `data/split.npy`。已核实它正好是 train 500，val 100，test 250，共 850 个场景，MotionNet 协议。
+目标是 500/100/250 个场景，MotionNet 协议。来源按优先级：
 
-复制到 `$DATA/splits/`，并 `assert` 三个数：train 500，val 100，test 250，且三者无交集。断言不过，说明上游版本不对，问我，不要自己改数。
+1. 我旧管线里的 split 文件，先问我要路径。
+2. 上游 `gen_data.py` 自带的划分，读 `--help` 与源码确认。
+3. MotionNet 论文附录。
+
+存到 `$DATA/splits/`，并 `assert` 三个数：train 500，val 100，test 250，且三者无交集。断言不过，说明来源不对，问我，不要自己改数。
 
 冒烟用 mini 划分：10 个场景分成 6，2，2。
 

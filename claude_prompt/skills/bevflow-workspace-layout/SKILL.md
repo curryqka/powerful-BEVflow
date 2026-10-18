@@ -27,6 +27,7 @@ $CODE/                          git 仓库
 ├── tests/
 ├── patches/                    对上游的补丁
 ├── third_party/MotionNet/      上游，只读
+├── ref/<name>/                 P6 的论文 PDF 与旧代码，只读，gitignore，不开源
 ├── docs/                       setup，design，experiments，reports，reference
 ├── data        -> $DATA        软链接，gitignore
 ├── experiment  -> $EXP         软链接，gitignore
@@ -58,7 +59,7 @@ $DATA/
 
 1. 对每个 NAS 根，`ls` 看二级目录名，只确认 `bevflow` 在不在，不进入别的项目。
 2. `mkdir -p` 建树。已存在就复用。
-3. 在 `$CODE` 里建三个软链接，用绝对路径，用 `readlink -f` 确认。写进 `.gitignore`。
+3. 在 `$CODE` 里建三个软链接，用绝对路径，用 `readlink -f` 确认。把软链接和 `ref/` 写进 `.gitignore`。
 
 # 路径来源只有一个
 

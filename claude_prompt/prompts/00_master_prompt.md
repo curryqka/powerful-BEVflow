@@ -14,7 +14,6 @@ EXP     = $NAS/Experiment/bevflow
 RESULTS = $NAS/results/bevflow
 DATA    = $NAS/data/bevflow
 CACHE   = $EXP/_cache
-RAW_NUSCENES = /media/nas_users/kaneqian/data/Nuscences
 ```
 
 ## 1. 背景与目标
@@ -34,7 +33,7 @@ RAW_NUSCENES = /media/nas_users/kaneqian/data/Nuscences
 3. 两个存储区各司其职，不污染其他项目。
 4. 固定一套和 MotionNet 对齐的经验参数，拿到第一轮结果。
 
-逆向复现 PriorMotion 和 LEGO-Motion 是第六阶段，我触发后再做。
+逆向复现 PriorMotion 和 LEGO-Motion 是第六阶段，库化与开源准备是第七阶段，都等我触发。最终目的是把我之前的工作和后续的新方法整理成一个开源算法库，所以从现在起，代码要按"别人也要用"来写。
 
 ## 2. 两个存储区
 
@@ -88,8 +87,8 @@ RAW_NUSCENES = /media/nas_users/kaneqian/data/Nuscences
 ### P1 地基
 
 skill：`bevflow-workspace-layout`，`bevflow-env-setup`。
-建目录与仓库，克隆并固定上游，用 uv 建环境，把数据软链接到上游期望的结构。下载 MotionNet 官方权重（Zenodo 8215963），记录文件名，大小与哈希。
-检查点：目录齐全，上游模块能 import，nuScenes 元数据能加载，官方权重已下载并记录哈希。
+建目录与仓库，克隆并固定上游，用 uv 建环境，把数据软链接到上游期望的结构。
+检查点：目录齐全，上游模块能 import，nuScenes 元数据能加载。
 
 ### P2 小批量冒烟，用上游原始代码
 
@@ -106,7 +105,7 @@ skill：`bevflow-refactor`。
 ### P4 固定参数与第一轮结果
 
 skill：`bevflow-experiment-run`，`bevflow-data-pipeline`。
-提取参数卡。全量预处理。用我们的评测器评测 MotionNet 官方权重（P1 已下载）。按对齐参数训练 R1A 与 R1B。评测，可视化，写报告。
+提取参数卡。全量预处理。下载 MotionNet 官方权重并用我们的评测器评测。按对齐参数训练 R1A 与 R1B。评测，可视化，写报告。
 检查点：结果表和报告已写好，与参考值的偏差已排查。
 
 ### P5 收尾
@@ -115,7 +114,14 @@ skill：`bevflow-experiment-run`，`bevflow-data-pipeline`。
 
 ### P6 逆向复现，我触发后才做
 
-skill：`bevflow-reverse-reproduce`。我会给出旧项目代码的路径。
+skill：`bevflow-reverse-reproduce`，`bevflow-library`。
+材料放在 `ref/<name>/`：论文 PDF，旧代码，我的备注。规格以论文为准，旧代码只是参考实现，结构与数据加载都可能有错，要审计，不要继承。论文与旧代码冲突，写进决策清单等我裁决，不要静默选择。先做数据层，再做模型。
+检查点：规格文档，审计文档，决策记录齐全。数据层测试通过。复现的结果与论文数字的对照表已写好，偏差已排查。
+
+### P7 库化与开源准备，我触发后才做
+
+skill：`bevflow-library`。
+整理接口，包布局，model zoo，出处与许可审计，私有信息清理，CPU 单元测试，README。许可方案由我决定。不公开仓库，不上传权重。
 
 ## 5. 工作方式
 

@@ -43,14 +43,11 @@ uv venv $EXP/_env/bevflow --python 3.10
 source $EXP/_env/bevflow/bin/activate
 ```
 
-本机全局 `UV_CACHE_DIR` 指向无权限的 `/media/nas_users/uv`。每个新 shell 都要先执行上面的 export，再跑 uv，否则 uv 直接报权限错误。
-
 安装用 `uv pip install`：
 
 1. 先装 torch。版本由 GPU 计算能力和驱动决定，不照搬上游的老版本。较新的 uv 支持 `--torch-backend=auto`，先用 `uv pip install --help` 确认。不支持就指定 `--index-url https://download.pytorch.org/whl/cuXXX`。
-2. 再装 numpy 等科学计算库，以及上游 requirements 里 nuscenes-devkit 之外的包。nuscenes-devkit 用上游 vendored 的精简版（`third_party/MotionNet/nuscenes-devkit`，PYTHONPATH 引用），不装 pip 版。
-3. MGDA 相关文件（`min_norm_solvers.py`，`train_*_MGDA.py`）只在 PyTorch 1.1 能跑，本项目不用。相关的兼容报错不修，记一行跳过。
-4. 每装一步就验证，不要最后一起验证。
+2. 再装 numpy 等科学计算库，nuscenes-devkit，以及上游 requirements 里的其余包。
+3. 每装一步就验证，不要最后一起验证。
 
 # 四、补丁协议
 
@@ -76,7 +73,3 @@ EOF
 提交 `requirements.lock.txt`，由 `uv pip freeze` 生成，并在 `docs/setup/env.md` 写下重建环境的命令。
 
 遇到装不上的包，先看报错，再决定换版本还是写补丁。判断不了就问我。
-
-# 七、官方权重
-
-下载 MotionNet 官方权重，Zenodo 记录 8215963。先打开页面确认文件名与大小，下载到 `$EXP/_models/motionnet_official/`，记录 sha256 进 `docs/setup/upstream.md`。网络不通就问我，让我上传。

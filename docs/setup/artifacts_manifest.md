@@ -1,0 +1,40 @@
+# 中间文件台账
+
+用途：你后面清理时的清单。新增产物随建随记。大小为 2026-10-18 快照。
+
+## 核心资产（保留）
+
+| 路径 | 大小 | 内容 |
+|---|---|---|
+| `$DATA/preprocessed/motionnet_v1/` | 54G | 全量预处理数据（17065/1719/4309）+ data_card + data_stats。一切训练的输入 |
+| `$DATA/splits/` | <1M | split.npy（500/100/250）+ mini_split.npy |
+| `$DATA/golden/` | ~140M | golden 基线（forward.npz/loss_inputs.npz），移植对拍用 |
+| `$DATA/raw/nuscenes` | 链接 | 原始数据只读链接 |
+| `$EXP/_env/bevflow/` | ~6G | uv 环境 |
+| `$EXP/_models/motionnet_official/` | 310M | 官方权重（zip+解压） |
+| `$EXP/R1B/<seed>/ckpt/` | ~2.9G/run | R1B 三种子 ckpt（epoch 1,5,10-45 + last.pt）。主表资产 |
+| `$EXP/R1A/20261017_R1A_motionnet_s1/ckpt/` | ~2.9G | R1A 官方结果（种子 1） |
+| `$EXP/P6PM/` | （增长中） | PriorMotion 参考实现双种子 |
+| `$RESULTS/`（registry/R1/eval/viz/_smoke） | ~2G | 全部评测产物与可视化 |
+| `$CODE/ref/` | 15M | P6 材料（论文/旧代码链接/notes），gitignore |
+
+## 过程产物（小，保留至对应阶段收尾）
+
+| 路径 | 大小 | 内容 | 处置建议 |
+|---|---|---|---|
+| `$EXP/_cache/cmdlogs/` | ~10M | 全部长命令日志（审计线索） | 保留 |
+| `$EXP/_cache/papers/` | ~1M | 两篇论文的文本抽取（P6 工作材料） | P7 开源审计后可删 |
+| `$EXP/_data_logs/` | ~5M | 数据生产日志 | 保留 |
+| `$EXP/_cache/smoke_cwd/`、`upstream_rerun_cwd/` | <1M | 冒烟/审计用 scratch（split npy 副本） | **现在可删** |
+| `/tmp/upstream_bs8_1ep/` | ~1G | 上游训练器仲裁实验产物（已完成使命） | **现在可删** |
+| `/tmp/eval_debug/`、`/tmp/eval_probe/`、`/tmp/upstream_rerun/` | ~1G | 塌缩调查/可视化调试临时物 | **现在可删** |
+| `$EXP/R1A/20261017_R1A_motionnet_s0/` | ~2.9G | 塌缩的种子 0 run（塌缩调查实证材料） | R1 报告归档后可删 |
+| `$EXP/R1A/20261018_R1A_official_s0/` | <1M | 已取消的重定义 run | 已终态，可删 |
+| `$EXP/P6PM/20261018_pmcheck_s0/` | <1M | 接线验证跑（被 timeout 杀） | 已终态，可删 |
+| `$EXP/R1B/*/logs/tb/` | 各~100M | tensorboard 事件文件 | 不需要看曲线时可删 |
+
+## 卫生规则（即刻生效）
+
+1. 新增的中间产物目录在创建时登记进本表。
+2. `$EXP/_cache/` 与 `/tmp` 是"可牺牲区"：任何清理从这里开始，不影响可复现性（真正的资产在 $DATA/$RESULTS/各 run 目录/仓库）。
+3. run 目录的清理原则：model zoo 定稿（P7）后，仅保留 zoo 引用的 ckpt 与 last.pt。

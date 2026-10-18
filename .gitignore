@@ -15,3 +15,6 @@ __pycache__/
 # 本地杂项
 .DS_Store
 *_session_env/
+
+# P6 材料（论文/旧代码/笔记），不入库不参与开源
+/ref

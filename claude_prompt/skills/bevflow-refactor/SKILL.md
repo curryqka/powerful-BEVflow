@@ -91,4 +91,3 @@ YAML 加简单的命令行覆盖，形如 `--set optim.lr=1e-3`。不引入重�
 - 不改默认超参。
 - 不顺手优化算法。
 - 不改张量含义和坐标约定。
-- MGDA 相关文件（`min_norm_solvers.py`，`train_*_MGDA.py`）不迁移。上游 README 写明它们只能在 PyTorch 1.1 跑。
