@@ -54,3 +54,13 @@ PriorMotionSTPN
 1. utlis/params_utlis.py 的 height_feat_size=26 与 eval/dataloader 的 13 矛盾——nuScenes 线以 13 为准（预处理实测 256×256×13）。
 2. 速度先验通道拼在 BEV z 维（height+1/+2）——nuScenes 线不用（无多普勒）。
 3. teacher-forcing（训练）与纯先验采样（推理）的不对称是 KL 成立的前提，trainer 移植不可丢。
+
+## 小范围探索计划（用户 2026-10-18 批准，忠实复现验证后进行）
+
+前提：DSpG 忠实复现的 val 轨迹稳定（约 epoch 10 后）。每项一个 run（~2 天，可与主 run 共卡）。
+
+1. **conv_fuser vs repeat-add 残差**：旧代码 forward 里 `conv_fuser` 已实现但被注释，改用了 `repeat + x` 残加——这是原作者留下的未决设计。conv_fuser 是可学习融合，预期对 latent 上采样后的特征整合更优。
+2. **kld_weight 扫描 {0.1, 0.5, 1.0}**：后验塌缩（KL→0，隐变量失效）是此类 VAE 的经典失败模式，与 R1 报告的零解塌缩同源。0.5 是旧值；观察 KL 曲线后决定方向。
+3. （视 val 表现）SGRU 隐态初始化 x_6 vs 零初始化；隐变量空间 16×16 vs 32×32。
+
+判据：val 三档 EPE（motionnet_v1 协议）+ 论文扩展口径（稳定性/长距离）。探索结果与忠实复现并列写入 reproduce 报告，不混入主对照表。
