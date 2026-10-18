@@ -30,9 +30,14 @@ def main():
     )
     cfg["_code_dir"] = CODE
 
-    from bevflow.trainers.multi_seq import train
+    if cfg["model"].get("name") == "priormotion":
+        from bevflow.trainers.prior import train_prior
 
-    train(cfg, run_dir)
+        train_prior(cfg, run_dir)
+    else:
+        from bevflow.trainers.multi_seq import train
+
+        train(cfg, run_dir)
     print("run done:", run_dir)
 
 

@@ -162,6 +162,15 @@ def compute_losses(
     return total, [loss_disp.item(), loss_class.item(), loss_motion.item(), bg_tc_value, sc_value, fg_tc_value]
 
 
+def kl_future_present(present_mu, present_log_sigma, future_mu, future_log_sigma):
+    """闭式 KL(future‖present)，逐位置求和后取均值。与旧代码 compute_vae_loss 逐行一致。"""
+    var_future = torch.exp(2 * future_log_sigma)
+    var_present = torch.exp(2 * present_log_sigma)
+    kl_div = (present_log_sigma - future_log_sigma - 0.5
+              + (var_future + (future_mu - present_mu) ** 2) / (2 * var_present))
+    return torch.mean(torch.sum(kl_div, dim=-1))
+
+
 def background_temporal_consistency_loss(cfg: LossConfig, disp_pred, pixel_cat_map_gt, non_empty_map, trans_matrices):
     """
     disp_pred: relative displacement between adjacent frames. shape (batch * 2, sweep_num, 2, h, w)

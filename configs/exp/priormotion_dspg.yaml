@@ -1,0 +1,26 @@
+# PriorMotion DSpG 复现（P6 第一步，对标论文 Table 7(e)）。
+# 超参 = 论文 §4.1 口径（bs4，45 epoch，与 R1B 预算一致）；sc=2.0 取旧代码实际值。
+# 数据：motionnet_v1（旧代码 nuScenes 数据线与上游逐字段等价，无需新数据生产）。
+_base_: ../base.yaml
+
+run:
+  exp_id: P6PM
+
+model:
+  name: priormotion
+
+loss:
+  use_bg_tc: true
+  use_fg_tc: true
+  use_sc: true
+  nn_sampling: false
+  reg_weight_bg_tc: 0.1
+  reg_weight_fg_tc: 2.5
+  reg_weight_sc: 2.0        # 旧代码 run_priormotionstpn.sh 实际值（上游 MotionNet 为 15.0）
+  aux_re_weight: 5.0        # 总损失 = 5.0 * aux + 0.5 * KL（旧代码 train_VAE.py:537-539）
+  kld_weight: 0.5
+
+train:
+  batch_size: 2             # SGRU T=20 展开激活超 44GB：bs2+累积2 等效 bs4（R1B 同款 fallback）
+  accum_steps: 2
+  val_batch_size: 2

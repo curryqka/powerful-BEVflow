@@ -76,7 +76,8 @@ def evaluate(
 
         padded_voxel_points = padded_voxel_points.to(device)
         with torch.no_grad():
-            disp_pred, class_pred, motion_pred = model(padded_voxel_points)
+            out = model(padded_voxel_points)  # MotionNet 3 元组；PriorMotion 4 元组（末位 vae_dict）
+            disp_pred, class_pred, motion_pred = out[0], out[1], out[2]
 
             pred_shape = disp_pred.size()
             disp_pred = disp_pred.view(all_disp_field_gt.size(0), -1, pred_shape[-3], pred_shape[-2], pred_shape[-1])
