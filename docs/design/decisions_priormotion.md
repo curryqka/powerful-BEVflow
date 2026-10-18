@@ -27,6 +27,8 @@
 
 ## 待你裁决
 
+**【用户确认 2026-10-18】D4=A 两步走；D5=A 严格按论文；D6=A 用 GT；D7=A 按代码；D8=B 同步移植扩展口径**
+
 **D4 RVpE 复现深度**（影响工期 2-3 天）：
  现象：论文主结果 0.8324 需要 RVpE（RpE+VpE+PCA）；旧代码只有积木（prior_extractor.py 的 GridInsTransformer/MaskedCrossAttention/位置编码），RpE 栅格分支无实现，主模型未接线。
  证据：论文 p.4 Fig 3、式2-7；prior_extractor.py:6-605；priormotion.py:12（import 未用）。

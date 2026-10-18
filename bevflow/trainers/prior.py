@@ -122,7 +122,18 @@ def train_prior(cfg, run_dir):
     start_epoch = 1
     if cfg["train"].get("resume", "auto") == "auto":
         latest, latest_n = find_latest_ckpt(ckpt_dir)
-        if latest is not None:
+        latest_pt = os.path.join(ckpt_dir, "latest.pt")
+        if os.path.exists(latest_pt):
+            # 实例停止保险：每 500 微批滚动保存。恢复时模型/优化器状态续接，
+            # 该 epoch 的数据从头重过一遍（随机顺序下无害）。
+            checkpoint = torch.load(latest_pt, map_location="cpu", weights_only=False)
+            if latest is None or checkpoint["epoch"] >= latest_n:
+                start_epoch = checkpoint["epoch"]
+                model.load_state_dict(checkpoint["model_state_dict"])
+                optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+                scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+                print(f"resumed mid-epoch state from {latest_pt} at epoch {checkpoint['epoch']}")
+        elif latest is not None:
             checkpoint = torch.load(latest, map_location="cpu", weights_only=False)
             start_epoch = checkpoint["epoch"] + 1
             model.load_state_dict(checkpoint["model_state_dict"])
@@ -183,6 +194,13 @@ def train_prior(cfg, run_dir):
             total.backward()
             if (i + 1) % accum_steps == 0 or i + 1 == len(trainloader):
                 optimizer.step()
+
+            if (i + 1) % 500 == 0:
+                torch.save({"epoch": epoch,
+                            "model_state_dict": model.state_dict(),
+                            "optimizer_state_dict": optimizer.state_dict(),
+                            "scheduler_state_dict": scheduler.state_dict()},
+                           os.path.join(ckpt_dir, "latest.pt"))
 
             epoch_loss += float(parts[0])
             n_steps += 1
