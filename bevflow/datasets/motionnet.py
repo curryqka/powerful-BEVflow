@@ -3,6 +3,8 @@
 行为保持：缓存机制、稀疏 dict 展开逻辑、classify_speed_level 调用均不变。
 数据卡断言在 data_card 一节实现（experiment-run 阶段接入），不在此处。
 """
+import hashlib
+import json
 import os
 import warnings
 from multiprocessing import Manager
@@ -14,6 +16,33 @@ from bevflow.preprocess.grid import classify_speed_level
 
 VOXEL_SIZE = (0.25, 0.25, 0.4)
 AREA_EXTENTS = np.array([[-32.0, 32.0], [-32.0, 32.0], [-3.0, 2.0]])
+
+_LISTING_CACHE = os.path.join(
+    os.environ.get("BEVFLOW_EXP", "/media/nas_users/kaneqian/Experiment/bevflow"),
+    "_cache", "seq_listings")
+
+
+def _cached_entries(root, kind):
+    """NAS 上 17065 次 stat 很慢，目录列表按 root mtime 缓存（见 artifacts_manifest）。
+
+    kind: "dirs" | "files"。root 的 mtime 变化（增删条目）即失效重扫。
+    """
+    os.makedirs(_LISTING_CACHE, exist_ok=True)
+    key = hashlib.sha1(f"{os.path.realpath(root)}:{kind}".encode()).hexdigest()
+    cache_file = os.path.join(_LISTING_CACHE, key + ".json")
+    root_mtime = os.stat(root).st_mtime
+    if os.path.exists(cache_file):
+        with open(cache_file) as f:
+            data = json.load(f)
+        if data.get("mtime") == root_mtime:
+            return data["entries"]
+    check = os.path.isdir if kind == "dirs" else os.path.isfile
+    entries = sorted(
+        os.path.join(root, d) for d in os.listdir(root) if check(os.path.join(root, d))
+    )
+    with open(cache_file, "w") as f:
+        json.dump({"mtime": root_mtime, "entries": entries}, f)
+    return entries
 
 
 class TrainDatasetMultiSeq(Dataset):
@@ -33,12 +62,7 @@ class TrainDatasetMultiSeq(Dataset):
             raise ValueError("The dataset root is None. Should specify its value.")
 
         self.dataset_root = dataset_root
-        seq_dirs = [
-            os.path.join(self.dataset_root, d)
-            for d in os.listdir(self.dataset_root)
-            if os.path.isdir(os.path.join(self.dataset_root, d))
-        ]
-        self.seq_dirs = seq_dirs
+        self.seq_dirs = _cached_entries(dataset_root, "dirs")
         self.num_sample_seqs = len(self.seq_dirs)
         if self.num_sample_seqs != 17065:
             warnings.warn(">> The size of training dataset is not 17065.\n")
@@ -169,8 +193,7 @@ class DatasetSingleSeq(Dataset):
             raise ValueError("The {} dataset root is None. Should specify its value.".format(split))
 
         self.dataset_root = dataset_root
-        seq_files = [os.path.join(self.dataset_root, d) for d in os.listdir(self.dataset_root) if os.path.isfile(os.path.join(self.dataset_root, d))]
-        self.seq_files = seq_files
+        self.seq_files = _cached_entries(dataset_root, "files")
         self.num_sample_seqs = len(self.seq_files)
         print("The number of {} sequences: {}".format(split, self.num_sample_seqs))
 

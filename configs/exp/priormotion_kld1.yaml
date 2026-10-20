@@ -1,0 +1,8 @@
+# kld 探索变体：kld_weight=1.0（对照基线 0.5 的后验塌缩，方向向上）
+_base_: priormotion_dspg.yaml
+
+run:
+  exp_id: P6EXP
+
+loss:
+  kld_weight: 1.0
