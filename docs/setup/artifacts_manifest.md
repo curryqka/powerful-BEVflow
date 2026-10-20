@@ -32,6 +32,9 @@
 | `$EXP/R1A/20261018_R1A_official_s0/` | <1M | 已取消的重定义 run | 已终态，可删 |
 | `$EXP/P6PM/20261018_pmcheck_s0/` | <1M | 接线验证跑（被 timeout 杀） | 已终态，可删 |
 | `$EXP/R1B/*/logs/tb/` | 各~100M | tensorboard 事件文件 | 不需要看曲线时可删 |
+| `$EXP/P6PM/2026101{8,20}_PM_*` | 各~2.9G（终态后） | PriorMotion 忠实双种子 + kld 探索双变体 | 报告归档后按 zoo 引用裁剪 |
+| `$EXP/_cache/watchdog.log`、`watchdog_runs.txt`、`seq_listings/` | <1M | 看守日志/规格、目录列表缓存 | 保留（看守运行依赖） |
+| `$EXP/_cache/cmdlogs/watchdog_*.log` | 各<1M | 看守重启的训练 stdout | 保留 |
 
 ## 卫生规则（即刻生效）
 
