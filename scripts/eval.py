@@ -30,13 +30,14 @@ def main():
     parser.add_argument("--run-id", default="")
     parser.add_argument("--bs", type=int, default=1, help="逐样本均值严格成立的官方用法是 1")
     parser.add_argument("--worker", type=int, default=2)
+    parser.add_argument("--model", default="motionnet", choices=["motionnet", "priormotion"])
     args = parser.parse_args()
 
     from bevflow.evaluators.motion_eval import evaluate
     from scripts.registry import append as registry_append
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = load_model(args.ckpt, device)
+    model = load_model(args.ckpt, device, args.model)
     metrics = evaluate(
         model, args.data_root, split=args.split, out_dir=args.out_dir,
         batch_size=args.bs, num_workers=args.worker, device=device,

@@ -18,7 +18,7 @@ sys.path.insert(0, UPSTREAM)
 sys.path.insert(0, os.path.join(UPSTREAM, "nuscenes-devkit", "python-sdk"))
 
 from bevflow.evaluators.motion_eval import evaluate  # noqa: E402
-from bevflow.models.loader import load_motionnet  # noqa: E402
+from bevflow.models.loader import load_model  # noqa: E402
 
 
 def main():
@@ -28,6 +28,7 @@ def main():
     p.add_argument("--n", type=int, default=10)
     p.add_argument("--bs", type=int, default=4)
     p.add_argument("--out", default=None)
+    p.add_argument("--model", default="motionnet", choices=["motionnet", "priormotion"])
     args = p.parse_args()
 
     ckpt_dir = os.path.join(args.run_dir, "ckpt")
@@ -43,7 +44,7 @@ def main():
     device = torch.device("cuda")
     records = []
     for epoch, path in pairs:
-        model = load_motionnet(path, device)
+        model = load_model(path, device, args.model)
         m = evaluate(model, args.val_root, split="val", out_dir=None,
                      batch_size=args.bs, num_workers=4, device=device)
         rec = {

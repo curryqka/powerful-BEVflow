@@ -1,11 +1,11 @@
 {
   "tasks": [
     {
-      "id": "a5958ce6",
+      "id": "fabd7a1e",
       "cron": "7 9,21 * * *",
-      "prompt": "这是 BEVflow 长任务的定时监控（每 12 小时一次）。只做汇报与小修，不开启新的阶段工作。步骤：\n1. 读 /media/nas_users/kaneqian/results/bevflow/registry.jsonl（若存在）看各 run 状态；读 /media/nas_users/kaneqian/results/bevflow/ 下最新的 eval/viz 产物。\n2. 检查后台训练进程：ps aux | grep -E \"train|gen_data\" 排除 grep 自身；看最新 run 的 logs/train.jsonl 与 stdout.log 的最后几行。\n3. git -C /home/kaneqian/BEVflow status --short 与 log --oneline -3，看进展到哪个阶段（对照 master prompt 的 P0-P6）。\n4. 用三五句话汇报：当前阶段、自上次汇报以来的进展（有数字引用日志原文）、下一步、需要用户拍板的事。若无任何变化也无异常，一句话说明即可。\n5. 若训练进程死了而任务未完成，诊断原因（读 stdout.log 尾部），小问题直接修复并重启（支持 --resume auto），大问题留给用户。\n6. 监控本身 7 天后自动过期（创建于 2026-10-16）。若发现过期或即将过期，提醒用户重建。",
-      "createdAt": 1792192914025,
-      "lastFiredAt": 1792489020746,
+      "prompt": "BEVflow 长任务定时监控（每 12 小时）。只做汇报与小修，不开启新阶段。\n\n0) 看守检查（最高优先）：`pgrep -f \"scripts/watchdog.sh\"`。若看守不在而 `$EXP/_cache/watchdog_runs.txt` 里仍有未完成 run（读各 run 的 train.jsonl 最后 epoch 与规格里的 total 比较）→ 立即 `cd /home/kaneqian/BEVflow && setsid nohup bash scripts/watchdog.sh &` 重启看守。看守日志在 `$EXP/_cache/cmdlogs/watchdog.log`。\n1) 读 /media/nas_users/kaneqian/results/bevflow/registry.jsonl 与各活跃 run 的 logs/train.jsonl 最后带 val 的 epoch 行；核对四类任务：PM_DSpG_s0/s1（忠实复现，目标 Table 7(e)）、PM_kld1/kld2（探索）、以及是否有 eval 排队。\n2) 检查训练进程与 GPU：`ps aux | grep train.py`、`nvidia-smi`；GPU 空闲但 run 未完成 → 由看守负责（见步骤 0），看守在却不重启 → 手动诊断 stdout 尾部。\n3) 完成度动作：某个 run 达到 total epoch → 按 C7 流程启动它的 eval_per_ckpt（val last-10）与 test bs1 终评，结果计入 reproduce_priormotion 报告草案；若四个训练全部完成且 GPU 空闲 → 汇报「可推进 RVpE 接线 / LEGO 重建 / D8 扩展口径」并等待用户指令，不要自作主张开新阶段。\n4) 用三五句话汇报：各 run epoch/val 关键数字（引用日志原文）、看守状态、下一步、需要拍板的事。无变化无异常则一句话。\n5) 监控 7 天后过期（2026-10-27），过期前提醒重建。",
+      "createdAt": 1792513331920,
+      "lastFiredAt": 1792661820301,
       "recurring": true,
       "createdBySessionId": "4e7a24de-30f1-465c-8c4e-1159f733500a",
       "createdByPid": 9224,
