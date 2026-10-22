@@ -14,11 +14,7 @@ for p in (CODE, UPSTREAM, os.path.join(UPSTREAM, "nuscenes-devkit", "python-sdk"
 
 import torch  # noqa: E402
 
-from bevflow.models.loader import load_motionnet  # noqa: E402
-
-
-def load_model(ckpt_path, device):
-    return load_motionnet(ckpt_path, device)
+from bevflow.models.loader import load_model  # noqa: E402
 
 
 def main():
