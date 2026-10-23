@@ -11,6 +11,16 @@
       "createdByPid": 9224,
       "createdByProcStart": "1185632",
       "createdInProject": "/home/kaneqian/BEVflow"
+    },
+    {
+      "id": "4ed60ef8",
+      "cron": "13 17 23 10 *",
+      "prompt": "BEVflow 一次性检查（kld 变体终评，前次 14:07 时在 e44/45）。检查 20261020_PM_kld1_s0 与 20261020_PM_kld2_s0 是否达到 45 epoch 且 ckpt/epoch_45.pth 存在（目录 /media/nas_users/kaneqian/Experiment/bevflow/P6EXP/）。完成的 run 启动：eval_per_ckpt --model priormotion --run-dir <dir> --val-root motionnet_v1/val；然后 test bs1 终评 --model priormotion --out-dir /media/nas_users/kaneqian/results/bevflow/P6/eval/<run_id>_test --run-id <run_id>_test。两卡并行（kld1 GPU0、kld2 GPU1，看守仍在线）。完成后：1) 用数字更新 docs/reports/reproduce_priormotion.md 第 5 节（补 test 行列）；2) 若四个训练全部完成、GPU 空闲、且无排队任务 → 汇报「P6 第一步全部完成，可推进：RVpE 接线（D4-A 第二步）/ D8 扩展口径 / LEGO-Motion 论文精读」，等待用户指令，不要自作主张开新阶段。",
+      "createdAt": 1792764445528,
+      "createdBySessionId": "4e7a24de-30f1-465c-8c4e-1159f733500a",
+      "createdByPid": 9224,
+      "createdByProcStart": "1185632",
+      "createdInProject": "/home/kaneqian/BEVflow"
     }
   ]
 }
