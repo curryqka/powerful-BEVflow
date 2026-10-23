@@ -26,7 +26,7 @@ def main():
     parser.add_argument("--run-id", default="")
     parser.add_argument("--bs", type=int, default=1, help="逐样本均值严格成立的官方用法是 1")
     parser.add_argument("--worker", type=int, default=2)
-    parser.add_argument("--model", default="motionnet", choices=["motionnet", "priormotion"])
+    parser.add_argument("--model", default="motionnet", choices=["motionnet", "priormotion", "priormotion_rvpe"])
     args = parser.parse_args()
 
     from bevflow.evaluators.motion_eval import evaluate

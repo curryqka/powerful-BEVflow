@@ -8,7 +8,7 @@ HEIGHT_FEAT = 13
 
 
 def load_model(ckpt_path, device, name="motionnet"):
-    if name == "priormotion":
+    if name in ("priormotion", "priormotion_rvpe"):
         import os
 
         import yaml
@@ -27,6 +27,8 @@ def load_model(ckpt_path, device, name="motionnet"):
             fusion=mc.get("fusion", "repeat"),
             sgru_hidden_init=mc.get("sgru_hidden_init", "x6"),
             latent_levels=mc.get("latent_levels", 4),
+            use_rvpe=mc.get("name") == "priormotion_rvpe",
+            num_grid=mc.get("num_grid", 20),
         ))
     else:
         model = nn.DataParallel(MotionNet(out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT))

@@ -28,7 +28,7 @@ def main():
     p.add_argument("--n", type=int, default=10)
     p.add_argument("--bs", type=int, default=4)
     p.add_argument("--out", default=None)
-    p.add_argument("--model", default="motionnet", choices=["motionnet", "priormotion"])
+    p.add_argument("--model", default="motionnet", choices=["motionnet", "priormotion", "priormotion_rvpe"])
     args = p.parse_args()
 
     ckpt_dir = os.path.join(args.run_dir, "ckpt")

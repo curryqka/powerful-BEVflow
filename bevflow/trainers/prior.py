@@ -112,11 +112,13 @@ def train_prior(cfg, run_dir):
         num_workers=cfg["train"].get("workers", 4))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    use_rvpe = cfg["model"].get("name") == "priormotion_rvpe"
     model = nn.DataParallel(PriorMotionSTPN(
         out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT,
         fusion=cfg["model"].get("fusion", "repeat"),
         sgru_hidden_init=cfg["model"].get("sgru_hidden_init", "x6"),
         latent_levels=cfg["model"].get("latent_levels", 4),
+        use_rvpe=use_rvpe, num_grid=cfg["model"].get("num_grid", 20),
     ))
     model = model.to(device)
     criterion = nn.SmoothL1Loss(reduction="none")
@@ -185,7 +187,21 @@ def train_prior(cfg, run_dir):
             padded = padded.view(-1, npf[0].item(), 256, 256, HEIGHT_FEAT).to(device)
             scene_gt = build_scene_gt(cat, disp_gt, motion_gt).to(device)
 
-            disp_pred, class_pred, motion_pred, vae_dict = model(padded, disp_gt_map=scene_gt)
+            instance_info = None
+            if use_rvpe:
+                from bevflow.preprocess.instances import get_instance_info_paper
+
+                b_adj = disp_gt.shape[0] * disp_gt.shape[1]
+                t_frames = disp_gt.shape[2]
+                instance_info = get_instance_info_paper(
+                    disp_gt.permute(0, 1, 2, 5, 3, 4).reshape(b_adj, t_frames, 2, 256, 256).numpy(),
+                    cat.permute(0, 1, 4, 2, 3).reshape(b_adj, 5, 256, 256).numpy(),
+                    inst.reshape(b_adj, 256, 256).numpy(),
+                    num_grid=cfg["model"].get("num_grid", 20),
+                )
+
+            disp_pred, class_pred, motion_pred, vae_dict = model(
+                padded, disp_gt_map=scene_gt, instance_info=instance_info)
             if i % accum_steps == 0:
                 optimizer.zero_grad()
             aux, parts = compute_losses(

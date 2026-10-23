@@ -16,8 +16,63 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from bevflow.models.motionnet import CellClassification, Conv3D, StateEstimation
+from bevflow.models.prior_extractor import MaskedCrossAttention, SimplePositionEncoding, VpE
 
 HEIGHT_FEAT = 13
+CAT_NUM = 5
+
+
+class RpE(nn.Module):
+    """栅格先验编码（论文式 2-4）。局部分支：1×1 3DConv(M) 时间并入通道 + 1×1 2DConv([C,S])；
+    全局分支：M 降分辨率 → TSA（空间逐点跨时间注意力）→ 与 [C,S] 拼接 → SSA（空间自注意力）；
+    ρ 为可学习融合系数。"""
+
+    def __init__(self, out_seq_len=20, channels=32, global_size=32, nheads=4):
+        super().__init__()
+        self.out_seq_len = out_seq_len
+        self.global_size = global_size
+        self.channels = channels
+        self.local_m = nn.Conv3d(2, 8, 1)
+        self.local_m_proj = nn.Conv2d(8 * out_seq_len, channels, 1)
+        self.local_cs = nn.Conv2d(CAT_NUM + 2, channels, 1)
+        self.local_fuse = nn.Conv2d(channels * 2, channels, 1)
+        self.global_m_proj = nn.Conv3d(2, channels, 1)
+        self.tsa = nn.MultiheadAttention(channels, nheads, batch_first=True)
+        self.global_cs = nn.Conv2d(CAT_NUM + 2, channels, 1)
+        self.ssa = nn.MultiheadAttention(channels, nheads, batch_first=True)
+        self.global_out = nn.Conv2d(channels, channels, 1)
+        self.rho = nn.Parameter(torch.tensor(0.5))
+
+    def forward(self, scene_gt):
+        B, _, H, W = scene_gt.shape
+        T = self.out_seq_len
+        c = scene_gt[:, :CAT_NUM]
+        m = scene_gt[:, CAT_NUM:CAT_NUM + 2 * T].view(B, T, 2, H, W)
+        s = scene_gt[:, CAT_NUM + 2 * T:]
+
+        fm = self.local_m(m.permute(0, 2, 1, 3, 4))           # (B,2,T,H,W) → (B,8,T,H,W)
+        fm = fm.reshape(B, 8 * T, H, W)                       # 时间并入通道（式 2）
+        fm = self.local_m_proj(fm)
+        fcs = self.local_cs(torch.cat([c, s], dim=1))
+        f_local = self.local_fuse(torch.cat([fm, fcs], dim=1))
+
+        G = self.global_size
+        mg = F.adaptive_avg_pool2d(m.reshape(B * T, 2, H, W), G).view(B, T, 2, G, G)
+        mg = mg.permute(0, 2, 1, 3, 4)                        # (B,2,T,G,G)
+        g = self.global_m_proj(mg).reshape(B, self.channels, T, G, G)
+        g = g.permute(0, 2, 1, 3, 4)                          # (B,T,C,G,G)
+        tokens = g.permute(0, 3, 4, 1, 2).reshape(B * G * G, T, self.channels)
+        tokens, _ = self.tsa(tokens, tokens, tokens)
+        f_gm = tokens.mean(dim=1).view(B, G, G, self.channels).permute(0, 3, 1, 2)
+        cs_small = F.adaptive_avg_pool2d(torch.cat([c, s], dim=1), G)
+        f_gcs = f_gm + self.global_cs(cs_small)
+        seq = f_gcs.flatten(2).permute(0, 2, 1)               # (B, G², C)
+        seq, _ = self.ssa(seq, seq, seq, need_weights=False)
+        f_global = self.global_out(seq.permute(0, 2, 1).view(B, self.channels, G, G))
+        f_global = F.interpolate(f_global, size=(H, W), mode="bilinear", align_corners=False)
+
+        rho = torch.sigmoid(self.rho)
+        return rho * f_global + (1 - rho) * f_local
 
 
 class MotionPredictionV2(nn.Module):
@@ -371,12 +426,15 @@ class PriorMotionSTPN(nn.Module):
     推理时 disp_gt_map=None 从观测先验采样。"""
 
     def __init__(self, out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT,
-                 use_checkpoint=True, fusion="repeat", sgru_hidden_init="x6", latent_levels=4):
+                 use_checkpoint=True, fusion="repeat", sgru_hidden_init="x6", latent_levels=4,
+                 use_rvpe=False, num_grid=20):
         super().__init__()
         self.out_seq_len = out_seq_len
         self.use_checkpoint = use_checkpoint
         self.fusion = fusion
         self.sgru_hidden_init = sgru_hidden_init
+        self.use_rvpe = use_rvpe
+        self.num_grid = num_grid
         # latent_levels=4 → 隐变量 16×16；3 → 32×32（探索项）
         vae_hidden = [32, 64, 128, 256][:latent_levels]
 
@@ -392,7 +450,43 @@ class PriorMotionSTPN(nn.Module):
         self.conv_fuser = ConvFuser(in_channels=[32, 32], out_channels=32)
         self.future_prediction = FuturePrediction(in_channels=32 * 4, latent_dim=32 * 4)
 
-    def forward(self, bevs, disp_gt_map=None, prior_velocity=None, prior_direction=None):
+        if use_rvpe:
+            # RVpE（仅训练期使用，论文 Fig 2）：RpE 栅格 + VpE 矢量 + PCA 融合（式 7）
+            self.rpe = RpE(out_seq_len=out_seq_len)
+            self.vpe = VpE(out_seq_len=out_seq_len, num_grid=num_grid, cat_num=CAT_NUM,
+                            dmodel=32, hidden_dim=256, nheads=4)
+            self.bev_pos_encoding = SimplePositionEncoding(num_feats=16, row_num_embed=256, col_num_embed=256)
+            self.pca = MaskedCrossAttention(embed_dims=32, num_heads=8, dropout=0.2)
+            self.prior_fuser = ConvFuser(in_channels=[32, 32, 32], out_channels=32)
+
+    def _rvpe_fuse(self, x, scene_gt, instance_info):
+        """B_prior = fuser([B, P_R, PCA(q=B, kv=P_V)])，式 7。实例过少时退化为仅 RpE。"""
+        B = x.size(0)
+        p_r = self.rpe(scene_gt)
+        pca_map = None
+        if instance_info is not None:
+            ins_pe, ins_disp, onehot = instance_info
+            if all(ins.shape[0] >= 2 for ins in ins_pe):
+                ins_feat = self.vpe(ins_pe, ins_disp, onehot, device=x.device)
+                shapes = torch.tensor([m.shape[0] for m in ins_feat], device=x.device)
+                max_n = int(shapes.max())
+                ins_feat = torch.stack([
+                    torch.cat([m, m.new_zeros(max_n - m.shape[0], m.shape[1])], dim=0) for m in ins_feat
+                ])
+                bev = x.flatten(2).permute(0, 2, 1)
+                bev_pos = self.bev_pos_encoding(torch.zeros(B, 256, 256, device=x.device))
+                bev_pos = bev_pos.flatten(2).permute(0, 2, 1)
+                pca_out = self.pca(bev, ins_feat, ins_feat, query_pos=bev_pos,
+                                   residual=bev, spatial_shapes=shapes)
+                pca_map = pca_out.permute(0, 2, 1).view(B, 32, 256, 256)
+        if pca_map is None:
+            out = self.prior_fuser([x, p_r, torch.zeros_like(x)])
+        else:
+            out = self.prior_fuser([x, p_r, pca_map])
+        return out
+
+    def forward(self, bevs, disp_gt_map=None, prior_velocity=None, prior_direction=None,
+                instance_info=None):
         bevs = bevs.permute(0, 1, 4, 2, 3)  # (Batch, seq, z, h, w)
 
         if prior_velocity is not None:
@@ -408,7 +502,10 @@ class PriorMotionSTPN(nn.Module):
 
         bev_gt_refine, vae_dict = None, None
         if disp_gt_map is not None:
-            con_x = torch.cat([x, disp_gt_map], dim=1)
+            feat_future = x
+            if self.use_rvpe:
+                feat_future = self._rvpe_fuse(x, disp_gt_map, instance_info)
+            con_x = torch.cat([feat_future, disp_gt_map], dim=1)
             bev_gt_refine, _, future_mu, future_log_sigma, _ = self.future_distrubution(con_x)
             vae_dict = {
                 'present_mu': present_mu,

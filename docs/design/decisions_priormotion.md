@@ -58,3 +58,8 @@
  证据：eval_general.py:316, 624-700, 43-83。
  选项：A 主对照（Table 2/3）完成后移植 B 与主对照同步做。
  建议：A——先保 Table 2/3 主线，扩展口径随后。
+
+## D9 VpE 实现口径【用户确认 2026-10-23：按论文重写】
+现象：原型 VpE 无 LSTM、无时序项、按 footprint 插值而非轨迹采样（见 audit 补充审计）。
+证据：论文 p.4 式5 与 §3.2.2；instance_extractor.py:277 起；prior_extractor.py GridInsTransformer。
+裁决：按论文重写 VpE（A），原型接线仅保留 PCA 与融合点。

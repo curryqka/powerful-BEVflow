@@ -30,7 +30,7 @@ def main():
     )
     cfg["_code_dir"] = CODE
 
-    if cfg["model"].get("name") == "priormotion":
+    if cfg["model"].get("name") in ("priormotion", "priormotion_rvpe"):
         from bevflow.trainers.prior import train_prior
 
         train_prior(cfg, run_dir)
