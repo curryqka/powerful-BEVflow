@@ -9,10 +9,25 @@ HEIGHT_FEAT = 13
 
 def load_model(ckpt_path, device, name="motionnet"):
     if name == "priormotion":
+        import os
+
+        import yaml
+
         from bevflow.models.priormotion import PriorMotionSTPN
 
-        model = nn.DataParallel(PriorMotionSTPN(out_seq_len=20, motion_category_num=2,
-                                                height_feat_size=HEIGHT_FEAT))
+        # 架构探索开关从 run 目录的 config_snapshot 读取，保证变体 ckpt 能正确重建模型
+        snap = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(ckpt_path))),
+                            "config_snapshot.yaml")
+        mc = {}
+        if os.path.exists(snap):
+            with open(snap) as f:
+                mc = (yaml.safe_load(f) or {}).get("model", {}) or {}
+        model = nn.DataParallel(PriorMotionSTPN(
+            out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT,
+            fusion=mc.get("fusion", "repeat"),
+            sgru_hidden_init=mc.get("sgru_hidden_init", "x6"),
+            latent_levels=mc.get("latent_levels", 4),
+        ))
     else:
         model = nn.DataParallel(MotionNet(out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT))
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)

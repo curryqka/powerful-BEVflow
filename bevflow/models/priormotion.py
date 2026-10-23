@@ -371,10 +371,14 @@ class PriorMotionSTPN(nn.Module):
     推理时 disp_gt_map=None 从观测先验采样。"""
 
     def __init__(self, out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT,
-                 use_checkpoint=True):
+                 use_checkpoint=True, fusion="repeat", sgru_hidden_init="x6", latent_levels=4):
         super().__init__()
         self.out_seq_len = out_seq_len
         self.use_checkpoint = use_checkpoint
+        self.fusion = fusion
+        self.sgru_hidden_init = sgru_hidden_init
+        # latent_levels=4 → 隐变量 16×16；3 → 32×32（探索项）
+        vae_hidden = [32, 64, 128, 256][:latent_levels]
 
         self.stpn = STPN(height_feat_size=height_feat_size)
         self.cell_classify = CellClassification()
@@ -382,9 +386,9 @@ class PriorMotionSTPN(nn.Module):
         self.state_classify = StateEstimation(motion_category_num=motion_category_num)
 
         self.present_distrubution = SimpleVAEV2(in_channels=32, latent_dim=32,
-                                                hidden_dims=[32, 64, 128, 256], bev_size=256)
+                                                hidden_dims=vae_hidden, bev_size=256)
         self.future_distrubution = SimpleVAEV2(in_channels=32 + 5 + 2 * out_seq_len + 2, latent_dim=32,
-                                               hidden_dims=[32, 64, 128, 256], bev_size=256)
+                                               hidden_dims=vae_hidden, bev_size=256)
         self.conv_fuser = ConvFuser(in_channels=[32, 32], out_channels=32)
         self.future_prediction = FuturePrediction(in_channels=32 * 4, latent_dim=32 * 4)
 
@@ -418,15 +422,20 @@ class PriorMotionSTPN(nn.Module):
 
         _, latent_dim, gauss_h, gauss_w = bev_refine.shape
         sample = bev_refine.unsqueeze(1).repeat(1, self.out_seq_len, 4, 4, 4)
+        hidden = x_tiny if self.sgru_hidden_init == "x6" else None
         if self.use_checkpoint and self.training:
             # SGRU T=20 展开的激活图远超 40GB 卡：检查点重算换显存，数值不变
             import torch.utils.checkpoint as cp
 
-            disp_feat = cp.checkpoint(self.future_prediction, sample, x_tiny, use_reentrant=False)
+            disp_feat = cp.checkpoint(self.future_prediction, sample, hidden, use_reentrant=False)
         else:
-            disp_feat = self.future_prediction(sample, x_tiny)
+            disp_feat = self.future_prediction(sample, hidden)
 
-        bev_refine = bev_refine.repeat(1, 1, int(256 / gauss_h), int(256 / gauss_w)) + x
+        if self.fusion == "conv_fuser":
+            bev_refine = F.interpolate(bev_refine, size=(256, 256), mode="nearest")
+            bev_refine = self.conv_fuser([x, bev_refine])
+        else:
+            bev_refine = bev_refine.repeat(1, 1, int(256 / gauss_h), int(256 / gauss_w)) + x
 
         cell_class_pred = self.cell_classify(bev_refine)
         state_class_pred = self.state_classify(bev_refine)

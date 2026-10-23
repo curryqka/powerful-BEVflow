@@ -1,0 +1,6 @@
+# 探索 1：conv_fuser 替代 repeat+add 残加（旧代码中被注释未决的设计）
+_base_: priormotion_dspg.yaml
+run:
+  exp_id: P6EXP
+model:
+  fusion: conv_fuser

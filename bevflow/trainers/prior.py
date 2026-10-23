@@ -112,7 +112,12 @@ def train_prior(cfg, run_dir):
         num_workers=cfg["train"].get("workers", 4))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = nn.DataParallel(PriorMotionSTPN(out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT))
+    model = nn.DataParallel(PriorMotionSTPN(
+        out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT,
+        fusion=cfg["model"].get("fusion", "repeat"),
+        sgru_hidden_init=cfg["model"].get("sgru_hidden_init", "x6"),
+        latent_levels=cfg["model"].get("latent_levels", 4),
+    ))
     model = model.to(device)
     criterion = nn.SmoothL1Loss(reduction="none")
     optimizer = optim.Adam(model.parameters(), lr=cfg["optim"].get("lr", 0.0016))
