@@ -187,6 +187,7 @@ class DatasetSingleSeq(Dataset):
         area_extents=AREA_EXTENTS,
         num_category=5,
         cache_size=8000,
+        return_instance=False,
     ):
         """单序列加载，评测用。dataset_root 是扁平目录，直接放 .npy 文件（见 scripts/flatten_eval_data.py）。"""
         if dataset_root is None:
@@ -209,6 +210,7 @@ class DatasetSingleSeq(Dataset):
         self.area_extents = area_extents
         self.num_category = num_category
         self.future_frame_skip = future_frame_skip
+        self.return_instance = return_instance
 
         manager = Manager()
         self.cache = manager.dict()
@@ -258,7 +260,7 @@ class DatasetSingleSeq(Dataset):
             all_disp_field_gt, total_future_sweeps=20, future_frame_skip=self.future_frame_skip
         )
 
-        return (
+        out = (
             padded_voxel_points,
             all_disp_field_gt,
             all_valid_pixel_maps,
@@ -268,3 +270,9 @@ class DatasetSingleSeq(Dataset):
             num_future_pcs,
             motion_state_gt,
         )
+        if not self.return_instance:
+            return out
+        # 扩展口径（稳定性指标）需要实例图：稀疏 dict → 稠密
+        pixel_instance_map = np.zeros((dims[0], dims[1]), dtype=np.uint8)
+        pixel_instance_map[pixel_indices[:, 0], pixel_indices[:, 1]] = gt_dict["pixel_instance_ids"]
+        return out + (pixel_instance_map,)

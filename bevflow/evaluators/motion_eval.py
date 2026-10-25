@@ -39,6 +39,7 @@ def evaluate(
     run_id="",
     ckpt_path="",
     meta=None,
+    collect_arrays=False,
 ):
     dataset = DatasetSingleSeq(
         dataset_root=dataset_root,
@@ -47,7 +48,9 @@ def evaluate(
         voxel_size=(0.25, 0.25, 0.4),
         area_extents=np.array([[-32.0, 32.0], [-32.0, 32.0], [-3.0, 2.0]]),
         num_category=CELL_CATEGORY_NUM,
+        return_instance=collect_arrays,
     )
+    collected = {"gt": [], "pred": [], "valid": [], "non_empty": [], "inst": []} if collect_arrays else None
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     speed_intervals = SPEED_INTERVALS
@@ -72,7 +75,9 @@ def evaluate(
             past_steps,
             future_steps,
             motion_gt,
-        ) = data
+        ) = data[:8]
+        if collect_arrays:
+            inst_map = data[8]
 
         padded_voxel_points = padded_voxel_points.to(device)
         with torch.no_grad():
@@ -114,6 +119,13 @@ def evaluate(
         all_disp_field_gt = all_disp_field_gt[:, -future_steps_np:]
         all_disp_field_gt = np.transpose(all_disp_field_gt, (0, 1, 4, 2, 3))
         all_disp_field_gt_norm = np.linalg.norm(all_disp_field_gt, ord=2, axis=2)
+
+        if collect_arrays:
+            collected["gt"].append(all_disp_field_gt.copy())
+            collected["pred"].append(disp_pred.copy())
+            collected["valid"].append(valid_pixel_maps.copy())
+            collected["non_empty"].append(non_empty_map.numpy().copy())
+            collected["inst"].append(np.asarray(inst_map).astype(np.uint8).copy())
 
         upper_bound = (future_frame_skip + 1) / 20 * STATIC_UPPER_THD
         static_cell_mask = all_disp_field_gt_norm <= upper_bound
@@ -238,4 +250,6 @@ def evaluate(
         with open(os.path.join(out_dir, "metrics.json"), "w") as f:
             json.dump(metrics, f, indent=1)
 
+    if collect_arrays:
+        return metrics, {k: np.concatenate(v, axis=0) for k, v in collected.items()}
     return metrics
