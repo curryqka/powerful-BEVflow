@@ -63,3 +63,9 @@
 现象：原型 VpE 无 LSTM、无时序项、按 footprint 插值而非轨迹采样（见 audit 补充审计）。
 证据：论文 p.4 式5 与 §3.2.2；instance_extractor.py:277 起；prior_extractor.py GridInsTransformer。
 裁决：按论文重写 VpE（A），原型接线仅保留 PCA 与融合点。
+
+## LEGO-Motion 决策预置（P6 第二阶段，代码已失）
+
+代码不存在，C2 审计无对象（缺失）。spec_legomotion.md 为唯一规格 + notes.md 用户记忆，
+两者已交叉核对一致（N=256/D=64、16×16 kv、Pre-LN、5.0·BCE+5.0·Dice、匹配代价、+0.2M）。
+实现前需用户确认的只剩歧义 1-3（query 层数、IaIE 深度、掩码头细节），可在接口冻结时批量提问。
