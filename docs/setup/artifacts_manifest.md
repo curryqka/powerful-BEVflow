@@ -41,3 +41,12 @@
 1. 新增的中间产物目录在创建时登记进本表。
 2. `$EXP/_cache/` 与 `/tmp` 是"可牺牲区"：任何清理从这里开始，不影响可复现性（真正的资产在 $DATA/$RESULTS/各 run 目录/仓库）。
 3. run 目录的清理原则：model zoo 定稿（P7）后，仅保留 zoo 引用的 ckpt 与 last.pt。
+
+## 暂停状态（2026-10-25 起，rebuttal 占用双卡）
+
+- 训练已全部停止：fuser_s0（e17 断点）、rvpe_s0（e16 断点，主线），进度由 latest.pt 保全。
+- 看守与排队器已停；原规格备份在 `$EXP/_cache/watchdog_runs.txt.suspended`。
+- **恢复步骤（用户说"用完"后）**：
+  1. `cp $EXP/_cache/watchdog_runs.txt.suspended $EXP/_cache/watchdog_runs.txt`
+  2. `setsid nohup bash $CODE/scripts/watchdog.sh &`（看守会自动发现未完成 run 并 resume）
+  3. `setsid nohup bash $CODE/scripts/queue_rvpe_s1.sh &`（fuser+rvpe_s0 结束后自动接 rvpe_s1 并注册看守）
