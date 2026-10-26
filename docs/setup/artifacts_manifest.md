@@ -42,7 +42,9 @@
 2. `$EXP/_cache/` 与 `/tmp` 是"可牺牲区"：任何清理从这里开始，不影响可复现性（真正的资产在 $DATA/$RESULTS/各 run 目录/仓库）。
 3. run 目录的清理原则：model zoo 定稿（P7）后，仅保留 zoo 引用的 ckpt 与 last.pt。
 
-## 暂停状态（2026-10-25 起，rebuttal 占用双卡）
+## 暂停状态（2026-10-25 起，rebuttal 占用双卡；**2026-10-26 07:24 已恢复**）
+
+- 恢复结果：fuser（e20 断点→续跑）、rvpe_s0（e19→续跑）在 GPU0；rvpe_s1 直接上 GPU1 续跑。
 
 - 训练已全部停止：fuser_s0（e17 断点）、rvpe_s0（e16 断点，主线），进度由 latest.pt 保全。
 - 看守与排队器已停；原规格备份在 `$EXP/_cache/watchdog_runs.txt.suspended`。
