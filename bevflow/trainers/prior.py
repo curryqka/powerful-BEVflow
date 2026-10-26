@@ -134,7 +134,7 @@ def train_prior(cfg, run_dir):
             # 实例停止保险：每 500 微批滚动保存。恢复时模型/优化器状态续接，
             # 该 epoch 的数据从头重过一遍（随机顺序下无害）。
             checkpoint = torch.load(latest_pt, map_location="cpu", weights_only=False)
-            if latest is None or checkpoint["epoch"] >= latest_n:
+            if latest is None or checkpoint["epoch"] > latest_n:
                 start_epoch = checkpoint["epoch"]
                 model.load_state_dict(checkpoint["model_state_dict"])
                 optimizer.load_state_dict(checkpoint["optimizer_state_dict"])

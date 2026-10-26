@@ -142,7 +142,7 @@ def train(cfg, run_dir):
     if resume == "auto" and os.path.exists(latest_pt):
         # 实例停止保险：每 500 步滚动保存；恢复时状态续接，epoch 数据从头重过（随机顺序无害）
         checkpoint = torch.load(latest_pt, map_location="cpu", weights_only=False)
-        if latest is None or checkpoint["epoch"] >= latest_n:
+        if latest is None or checkpoint["epoch"] > latest_n:
             start_epoch = checkpoint["epoch"]
             model.load_state_dict(checkpoint["model_state_dict"])
             optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
