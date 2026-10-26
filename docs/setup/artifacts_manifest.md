@@ -52,3 +52,13 @@
   1. `cp $EXP/_cache/watchdog_runs.txt.suspended $EXP/_cache/watchdog_runs.txt`
   2. `setsid nohup bash $CODE/scripts/watchdog.sh &`（看守会自动发现未完成 run 并 resume）
   3. `setsid nohup bash $CODE/scripts/queue_rvpe_s1.sh &`（fuser+rvpe_s0 结束后自动接 rvpe_s1 并注册看守）
+
+## 暂停状态二（2026-10-26 18:xx，用户 rebuttal 第二轮，立即停机）
+
+- fuser_s0（e25 中段）与 rvpe_s0（e24 中段）已立即停止；latest.pt 保全（最多损失 ~500 步 ≈ 4 分钟）。
+- rvpe_s1（e14 断点）此前已停。看守/排队器/用户的收尾停止器均已停。
+- 恢复命令（resume auto）：
+  `CUDA_VISIBLE_DEVICES=0 python scripts/train.py --config configs/exp/priormotion_fuser.yaml --set run.run_id=20261023_PM_fuser_s0 train.seed=0 train.val_interval=2`
+  `CUDA_VISIBLE_DEVICES=0 python scripts/train.py --config configs/exp/priormotion_rvpe.yaml --set run.run_id=20261023_PM_rvpe_s0 train.seed=0 train.val_interval=2`
+  `CUDA_VISIBLE_DEVICES=1 python scripts/train.py --config configs/exp/priormotion_rvpe.yaml --set run.run_id=20261023_PM_rvpe_s1 train.seed=1 train.val_interval=2`
+  （恢复优先级已修复：同 epoch 时用 epoch_N.pth 而非 mid-epoch latest.pt）
