@@ -80,7 +80,7 @@ def mask_cls_loss(pred_masks, pred_logits, gt_targets, matches, no_obj_weight=0.
         matched_pred = set(ri.tolist())
         gt_masks, gt_classes = gt_targets[b]
 
-        cls_ce = log_probs[b][:, NUM_CLASSES - 1] * no_obj_weight  # 未匹配默认 no-object
+        cls_ce = -log_probs[b][:, NUM_CLASSES - 1] * no_obj_weight  # 未匹配默认 no-object（CE 为正）
         if len(ri):
             gt_cls = torch.as_tensor(gt_classes[ci], device=pred_logits.device)
             cls_ce = cls_ce.index_put((torch.as_tensor(ri, device=pred_logits.device),), -log_probs[b][
