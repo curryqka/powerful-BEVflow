@@ -59,10 +59,15 @@ def match_batch(pred_masks, pred_logits, gt_targets, w_cls=1.0, w_bce=5.0, w_dic
             matches.append((np.array([], dtype=int), np.array([], dtype=int)))
             continue
         tgt = torch.as_tensor(gt_masks, dtype=pred_masks.dtype, device=pred_masks.device).flatten(1)
+        # 逐 GT 实例计算代价，避免 N×Ng×HW 的广播中间量（峰值 ~4GB → ~67MB）
+        n_gt = tgt.shape[0]
+        bce = torch.empty((pred_masks.shape[1], n_gt), dtype=pred_masks.dtype, device=pred_masks.device)
+        dice = torch.empty_like(bce)
+        prob = pred_masks[b].sigmoid()
         with torch.no_grad():
-            prob = pred_masks[b].sigmoid()
-            bce = _sigmoid_focal_free_bce(pred_masks[b].unsqueeze(1), tgt.unsqueeze(0)).mean(-1)
-            dice = _dice(prob.unsqueeze(1), tgt.unsqueeze(0))
+            for j in range(n_gt):
+                bce[:, j] = _sigmoid_focal_free_bce(pred_masks[b], tgt[j]).mean(-1)
+                dice[:, j] = _dice(prob, tgt[j])
             cls_cost = -log_probs[b][:, torch.as_tensor(gt_classes, device=pred_masks.device)]
             cost = w_cls * cls_cost + w_bce * bce + w_dice * dice
         ri, ci = linear_sum_assignment(cost.detach().cpu().numpy())
