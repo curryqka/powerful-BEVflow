@@ -1,0 +1,22 @@
+# LEGO-Motion 复现（P6 第二阶段）。论文口径：45ep/bs4/Adam1.6e-3，两阶段 λ 调度。
+# 数据：motionnet_v1（含实例图，零新增数据）。一致性损失关闭（论文未使用）。
+_base_: ../base.yaml
+
+run:
+  exp_id: LEGO
+
+model:
+  name: legomotion
+  dim: 64
+  n_queries: 256
+  bev_scale: 16
+
+loss:
+  use_bg_tc: false
+  use_fg_tc: false
+  use_sc: false
+
+train:
+  batch_size: 2          # GPU1 与 rvpe_s1 共卡期间显存约束；累积 2 等效论文 bs4
+  accum_steps: 2
+  val_batch_size: 2

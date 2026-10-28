@@ -30,7 +30,12 @@ def main():
     )
     cfg["_code_dir"] = CODE
 
-    if cfg["model"].get("name") in ("priormotion", "priormotion_rvpe"):
+    name = cfg["model"].get("name")
+    if name == "legomotion":
+        from bevflow.trainers.legomotion import train_legomotion
+
+        train_legomotion(cfg, run_dir)
+    elif name in ("priormotion", "priormotion_rvpe"):
         from bevflow.trainers.prior import train_prior
 
         train_prior(cfg, run_dir)
