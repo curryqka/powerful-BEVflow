@@ -25,7 +25,9 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--run-dir", required=True)
     p.add_argument("--test-root", required=True)
-    p.add_argument("--n", type=int, default=10)
+    p.add_argument("--n", type=int, default=10, help="末 N 个（stride 模式忽略）")
+    p.add_argument("--stride", type=int, default=0, help=">0 时改为每 stride 个 epoch 抽测")
+    p.add_argument("--start", type=int, default=0, help="抽测起始 epoch")
     p.add_argument("--model", default="priormotion")
     args = p.parse_args()
 
@@ -36,7 +38,10 @@ def main():
         if m:
             pairs.append((int(m.group(1)), os.path.join(ckpt_dir, f)))
     pairs.sort()
-    pairs = pairs[-args.n:]
+    if args.stride > 0:
+        pairs = [(e, p) for e, p in pairs if e >= args.start and e % args.stride == 0]
+    else:
+        pairs = pairs[-args.n:]
     assert pairs
 
     device = torch.device("cuda")
