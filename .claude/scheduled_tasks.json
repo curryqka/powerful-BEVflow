@@ -5,7 +5,7 @@
       "cron": "7 9,21 * * *",
       "prompt": "BEVflow 长任务定时监控（每 12 小时）。只做汇报与小修，不开启新阶段。\n\n0) 看守检查：`pgrep -f \"scripts/watchdog.sh\"`；不在且有未完成 run → 重启 `setsid nohup bash /home/kaneqian/BEVflow/scripts/watchdog.sh &`（规格 $EXP/_cache/watchdog_runs.txt；若被挂起，先 cp watchdog_runs.txt.suspended 回来）。\n1) 活跃 run 检查：20261023_PM_rvpe_s0（GPU0，主线）、20261023_PM_rvpe_s1（GPU1）、20261023_PM_fuser_s0（GPU0，探索），读各目录 logs/train.jsonl 最后带 val 的 epoch 行；GPU 状态。\n2) 完成度动作：某 run 达 45 epoch → 启动 eval_per_ckpt --model priormotion（val last-10）+ test bs1 终评（--model priormotion，out-dir $RESULTS/P6/eval/<run_id>_test）。RVpE 两个种子都完成后：用 test 数字更新 docs/reports/reproduce_priormotion.md，加「RVpE 对照 Table 2（目标 0.8324）」章节；并启动 D8 扩展口径验证（bevflow/evaluators/motion_eval_general.py 的 evaluate_general，对 RVpE 的 epoch_45 跑 test）。\n3) GPU 全部空闲且无排队 → 汇报「P6 RVpE 阶段完成，可推进：LEGO 接口设计（C4）/ 报告定稿」等用户指令，不自作主张开新阶段。\n4) 三五句话汇报：各 run epoch/val 关键数字（引用日志原文）、看守状态、下一步、待拍板事项；无变化一句话。\n5) 本监控 7 天后过期（2026-11-02），过期前提醒重建。",
       "createdAt": 1793007438725,
-      "lastFiredAt": 1793180220174,
+      "lastFiredAt": 1793223420042,
       "recurring": true,
       "createdBySessionId": "4e7a24de-30f1-465c-8c4e-1159f733500a",
       "createdByPid": 9224,
