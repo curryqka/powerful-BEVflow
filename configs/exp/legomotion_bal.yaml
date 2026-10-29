@@ -1,0 +1,26 @@
+# LEGO-Motion 损失配比探针（探索，非基线）。
+# 依据：2026-10-29 梯度探针（$EXP/_cache/cmdlogs/probe_loss_balance.log）——
+# mask 项占加权损失 98.4%，共享骨干上 mask 梯度为 grid 的 58-764 倍且近正交（cos 0.011）。
+# 论文正文只写 "binary mask loss"，5.0·BCE+5.0·Dice 系数来自 notes 记忆，允许调整配比。
+# mask_scale=0.03：mask 梯度降到 stpn 上约 2.7x、iebe 约 1.7x，iaie（query 专属）仍以 mask 为主。
+_base_: ../base.yaml
+
+run:
+  exp_id: LEGO
+
+model:
+  name: legomotion
+  dim: 64
+  n_queries: 256
+  bev_scale: 16
+
+loss:
+  use_bg_tc: false
+  use_fg_tc: false
+  use_sc: false
+  mask_scale: 0.03
+
+train:
+  batch_size: 2          # 与基线一致（bs2+累积2 等效 bs4）
+  accum_steps: 2
+  val_batch_size: 2

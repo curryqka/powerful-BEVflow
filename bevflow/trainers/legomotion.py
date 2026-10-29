@@ -152,6 +152,9 @@ def train_legomotion(cfg, run_dir):
                              if k in ("use_bg_tc", "use_fg_tc", "use_sc", "nn_sampling",
                                       "reg_weight_bg_tc", "reg_weight_fg_tc", "reg_weight_sc")})
     accum_steps = cfg["train"].get("accum_steps", 1)
+    # mask 分支梯度实测为 grid 的 58-764 倍（探针，2026-10-29），共享骨干被 mask 主导；
+    # mask_scale 用于重新配比（论文原文未给 Dice/BCE 系数，来自 notes 记忆，可调）。
+    mask_scale = cfg.get("loss", {}).get("mask_scale", 1.0)
 
     train_jsonl = os.path.join(logs_dir, "train.jsonl")
     try:
@@ -197,7 +200,7 @@ def train_legomotion(cfg, run_dir):
             matches = match_batch(pred_masks, pred_logits, mask_targets)
             m_loss, mask_parts = mask_cls_loss(pred_masks, pred_logits, mask_targets, matches)
             lam = lambda_schedule(epoch)
-            total = (lam["grid"] * aux + lam["mask"] * m_loss) / accum_steps
+            total = (lam["grid"] * aux + lam["mask"] * mask_scale * m_loss) / accum_steps
             total.backward()
             if (i + 1) % accum_steps == 0 or i + 1 == len(trainloader):
                 optimizer.step()
@@ -218,7 +221,7 @@ def train_legomotion(cfg, run_dir):
                            "disp": parts[0], "cls": parts[1], "motion": parts[2],
                            "bg_tc": parts[3], "sc": parts[4], "fg_tc": parts[5],
                            "mask_ce": mask_parts["mask_ce"], "mask_bce": mask_parts["mask_bce"],
-                           "mask_dice": mask_parts["mask_dice"],
+                           "mask_dice": mask_parts["mask_dice"], "mask_scale": mask_scale,
                            "lambda_grid": lam["grid"], "lambda_mask": lam["mask"]},
                        "lr": lr_now, "time": round(time.time() - t_epoch, 3)}
                 write_jsonl(rec)
