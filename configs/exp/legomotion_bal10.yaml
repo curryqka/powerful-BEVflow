@@ -1,0 +1,8 @@
+# LEGO mask_scale=0.1 敏感性对照（与 bal03 并行最省时的扫描点；0.01 暂不跑）
+_base_: legomotion_bal.yaml
+
+run:
+  exp_id: LEGO
+
+loss:
+  mask_scale: 0.1

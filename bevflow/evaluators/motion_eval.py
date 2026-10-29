@@ -40,6 +40,7 @@ def evaluate(
     ckpt_path="",
     meta=None,
     collect_arrays=False,
+    batch_callback=None,
 ):
     dataset = DatasetSingleSeq(
         dataset_root=dataset_root,
@@ -48,7 +49,7 @@ def evaluate(
         voxel_size=(0.25, 0.25, 0.4),
         area_extents=np.array([[-32.0, 32.0], [-32.0, 32.0], [-3.0, 2.0]]),
         num_category=CELL_CATEGORY_NUM,
-        return_instance=collect_arrays,
+        return_instance=(collect_arrays or batch_callback is not None),
     )
     collected = {"gt": [], "pred": [], "valid": [], "non_empty": [], "inst": []} if collect_arrays else None
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
@@ -76,7 +77,7 @@ def evaluate(
             future_steps,
             motion_gt,
         ) = data[:8]
-        if collect_arrays:
+        if collect_arrays or batch_callback is not None:
             inst_map = data[8]
 
         padded_voxel_points = padded_voxel_points.to(device)
@@ -126,6 +127,9 @@ def evaluate(
             collected["valid"].append(valid_pixel_maps.copy())
             collected["non_empty"].append(non_empty_map.numpy().copy())
             collected["inst"].append(np.asarray(inst_map).astype(np.uint8).copy())
+        if batch_callback is not None:
+            batch_callback(all_disp_field_gt, disp_pred, valid_pixel_maps,
+                           non_empty_map.numpy(), np.asarray(inst_map).astype(np.uint8))
 
         upper_bound = (future_frame_skip + 1) / 20 * STATIC_UPPER_THD
         static_cell_mask = all_disp_field_gt_norm <= upper_bound
