@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """从 train split 固定种子抽 10 个场景做冒烟：6/2/2。"""
 import argparse
 

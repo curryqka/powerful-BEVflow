@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """数据统计：每 split 随机抽 20 个样本查形状/数值，统计三档占比与动态格子比例。
 
 结果写 $DATA/preprocessed/motionnet_v1/data_stats.json。用法：

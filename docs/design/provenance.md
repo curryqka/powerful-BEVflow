@@ -35,3 +35,17 @@
 1. 用户选定许可方案后：调整 LICENSE、各文件头。
 2. `scripts/audit_release.sh` 私有信息扫描（绝对路径/用户名/主机名/token/大文件）——待写。
 3. 不公开仓库、不上传权重，直到用户明确决定。
+
+## 5. 用户决定（2026-10-29）：方案 B，按文件双许可
+
+- **用户确认：VAE、SGRU 那套为从零手写** → PriorMotion 模型谱系（vae/SGRU/先验编码器/解码器）按 Apache-2.0 授权。
+- 采用按文件 SPDX 双许可（方案 B 的落地形态）：
+  - `AGPL-3.0-or-later`：preprocess/{grid,convert,generate}.py、datasets/motionnet.py、
+    models/motionnet.py、models/losses.py、evaluators/motion_eval.py、
+    evaluators/motion_eval_general.py、trainers/multi_seq.py（派生自 MERL 代码）。
+  - `Apache-2.0`：models/{priormotion,prior_extractor,loader}.py、models/legomotion/*、
+    trainers/{prior,legomotion}.py、evaluators/viz.py、preprocess/instances.py、utils/*、
+    scripts/*、tests/*。
+  - 依赖声明：Apache 模型文件运行时依赖 AGPL 原语，组合分发须满足 AGPL（已写入 LICENSE）。
+- 许可文本：`LICENSES/Apache-2.0.txt`、`LICENSES/AGPL-3.0-or-later.txt`；根 `LICENSE` 为双许可说明。
+- 若后续希望整库宽松（去掉 AGPL 依赖），走方案 C：按论文协议重写共享基础设施，现有 golden 测试可用于验收。

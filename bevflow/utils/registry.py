@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """按名字构建的最小注册表。"""
 
 

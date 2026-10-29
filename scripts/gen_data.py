@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """数据生产薄入口。用法：
 python scripts/gen_data.py --split train [--scenes 116 229] \
     --savepath $DATA/preprocessed/motionnet_v1/train

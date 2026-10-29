@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """冒烟可视化：固定 4 个 val 样本，风格对齐上游 plots.py。
 
 每个样本四张 PNG：GT quiver，预测 quiver（类别着色，同 plots.py），|pred-gt| 误差图，

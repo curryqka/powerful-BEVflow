@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 本文件派生自 MERL MotionNet（https://github.com/merlresearch/MotionNet）。
 """MotionNet 损失。从上游 train_multi_seq.py 逐行搬运。
 
 行为等价性说明：

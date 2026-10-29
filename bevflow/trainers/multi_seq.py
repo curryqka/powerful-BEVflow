@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 本文件派生自 MERL MotionNet（https://github.com/merlresearch/MotionNet）。
 """多序列训练器。训练循环从上游 train_multi_seq.py 搬运，数值行为一致：
 - Adam lr=0.0016，MultiStepLR milestones [10,20,30,40] gamma 0.5
 - scheduler.step() 在 epoch 开始时调用（上游固有顺序，保持）

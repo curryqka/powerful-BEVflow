@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """VpE 的实例序列提取。从旧代码 data/instance_extractor.py 的 get_instance_infoV2 搬运：
 按实例取像素坐标，凸包内插值 num_grid 个点与其末帧位移，类别 one-hot。
 

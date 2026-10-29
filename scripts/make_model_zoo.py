@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """从 registry.jsonl 生成 docs/model_zoo.md（P7，不手写）。"""
 import json
 import os

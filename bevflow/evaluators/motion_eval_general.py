@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 本文件派生自 MERL MotionNet（https://github.com/merlresearch/MotionNet）。
 """扩展评测口径（D8，论文 Table 4/5）。移植自旧代码 eval_general.py：
 
 - 空间分桶：到自车距离 [0,10)/(10,20)/(20,100) 米。

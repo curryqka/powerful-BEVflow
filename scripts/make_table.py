@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """结果表生成：输入 run_id 列表，从 registry 找到 metrics.json，汇总 markdown 表。
 
 用法：python scripts/make_table.py --runs R1B_s0_ep45_test ...

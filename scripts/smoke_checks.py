@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """冒烟检查子命令：s1 数据检查，overfit 单 batch 过拟合，s3 ckpt 一致性，res 资源实测。
 
 用法：python scripts/smoke_checks.py <s1|overfit|s3|res> [参数]

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 本文件派生自 MERL MotionNet（https://github.com/merlresearch/MotionNet）。
 """稠密 BEV 组装与稀疏化。从上游 data/gen_data.py 原样搬运，含自校验断言。"""
 import numpy as np
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """对 run 的最后 N 个 epoch ckpt 在 test 集上逐一评测（bs1），写 per_ckpt_test.json。
 
 与 eval_per_ckpt（val）互补：验证指标对 ckpt 的敏感性，并支持按 val 选 ckpt、test 报数。

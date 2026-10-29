@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 本文件派生自 MERL MotionNet（https://github.com/merlresearch/MotionNet）。
 """BEV 网格与 GT 生成。从上游 data/data_utils.py 原样搬运本项目路径用到的函数。
 
 未搬运：voxelize（含 numba padding_voxel）、voxelize_pillar_indices、voxelize_point_pillar、

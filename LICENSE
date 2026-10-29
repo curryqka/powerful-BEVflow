@@ -1,0 +1,23 @@
+bevflow 采用按文件的双许可（方案 B）。
+
+1. 标 Apache-2.0 的文件（SPDX-License-Identifier: Apache-2.0）
+   许可：Apache License 2.0，全文见 LICENSES/Apache-2.0.txt。
+   包括：PriorMotion 的模型与 VAE/SGRU/先验编码器（用户原创）、RVpE 与 LEGO-Motion 的
+   实现、训练器、工具、脚本、测试。
+   注意：其中若干文件在运行时依赖 AGPL 许可的原语（bevflow.models.motionnet 的
+   STPN/三头等）。若将这些文件与依赖一并分发，组合作品的使用须满足 AGPL。
+
+2. 标 AGPL-3.0-or-later 的文件（SPDX-License-Identifier: AGPL-3.0-or-later）
+   许可：GNU Affero General Public License v3.0 or later，全文见
+   LICENSES/AGPL-3.0-or-later.txt。
+   包括：从 MERL MotionNet（https://github.com/merlresearch/MotionNet，
+   Copyright (C) 2020, 2023 Mitsubishi Electric Research Laboratories）派生的
+   预处理、数据加载、MotionNet 模型原语、损失、评测代码。
+
+3. 不随本库发布的目录
+   third_party/（上游克隆，AGPL 与 CC-BY-NC-SA-4.0）、ref/（论文与旧项目材料）、
+   docs/setup/ 与 claude_prompt/（内部过程资料）。分发时须整体排除。
+
+4. 数据
+   nuScenes 数据与由此训练的权重发布前须另行核对数据许可条款（参见
+   docs/design/provenance.md）。

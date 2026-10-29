@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """可视化薄入口。用法：
 python scripts/viz.py --val-root <val 目录> --ckpt <ckpt> --out-dir <目录> [--n 4 --seed 0]
 风格与上游 plots.py 对齐（类别色 quiver），另附误差图与静态噪点图。

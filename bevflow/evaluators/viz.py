@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """可视化渲染。风格对齐上游 plots.py（类别色 quiver），附误差图与静态噪点图。"""
 import json
 import os

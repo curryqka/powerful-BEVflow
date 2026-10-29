@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """对 run 的最后 N 个 epoch ckpt 逐一评测 val，写 per_ckpt.json（含均值与标准差）。
 
 静态指标对 ckpt 敏感，主表报告 last-10 的均值±标准差，而非单点。

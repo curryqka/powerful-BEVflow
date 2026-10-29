@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """把 gen_data 输出的 <scene>_<seq>/N.npy 拍平成 <scene>_<seq>_<N>.npy。
 
 上游 DatasetSingleSeq（eval.py 用）只认扁平目录下的 .npy 文件，见

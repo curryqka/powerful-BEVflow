@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """结果登记：$RESULTS/registry.jsonl 是唯一真源，只追加不改旧行，同一 run_id 以最后一行为准。
 
 用法：

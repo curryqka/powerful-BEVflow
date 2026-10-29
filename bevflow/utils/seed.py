@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """固定随机种子：python，numpy，torch，torch.cuda。"""
 import os
 import random

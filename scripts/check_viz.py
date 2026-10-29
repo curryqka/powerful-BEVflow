@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """数值检查可视化 PNG：存在且 >5KB，尺寸达标，像素 std>0，误差图非全零（预测不等于 GT）。"""
 import argparse
 import json

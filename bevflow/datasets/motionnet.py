@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 本文件派生自 MERL MotionNet（https://github.com/merlresearch/MotionNet）。
 """MotionNet 数据加载器。从上游 data/nuscenes_dataloader.py 原样搬运两个 Dataset。
 
 行为保持：缓存机制、稀疏 dict 展开逻辑、classify_speed_level 调用均不变。

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# 注意：本文件在运行时依赖 AGPL-3.0-or-later 许可的 bevflow.models.motionnet 原语
+# （STPN/三头等，派生自 MERL MotionNet）。组合使用时的许可见 LICENSE。
 """LEGO-Motion 掩码损失（spec 式10 + 用户记忆口径）。
 
 匹配代价 C = 1.0·(−p_cls) + 5.0·BCE + 5.0·Dice；no-object 类 0.1 降权；

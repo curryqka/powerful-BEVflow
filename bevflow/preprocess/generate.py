@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 本文件派生自 MERL MotionNet（https://github.com/merlresearch/MotionNet）。
 """nuScenes -> MotionNet 协议预处理数据。从上游 data/gen_data.py 主循环搬运。
 
 与上游的差异（仅结构）：

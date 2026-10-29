@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """评测薄入口。用法：
 python scripts/eval.py --ckpt <run>/ckpt/last.pt --data-root <val 或 test 目录> \
     --split val --out-dir <结果目录> --run-id <id>

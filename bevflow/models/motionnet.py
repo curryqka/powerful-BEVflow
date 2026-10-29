@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 本文件派生自 MERL MotionNet（https://github.com/merlresearch/MotionNet）。
 """MotionNet 主干与三头。从上游 model.py 原样搬运。
 
 - 类名与属性名保持不变（stpn / cell_classify / motion_pred / state_classify），

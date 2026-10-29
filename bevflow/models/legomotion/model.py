@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# 注意：本文件在运行时依赖 AGPL-3.0-or-later 许可的 bevflow.models.motionnet 原语
+# （STPN/三头等，派生自 MERL MotionNet）。组合使用时的许可见 LICENSE。
 """LEGO-Motion（IROS 2025）实现。规格见 docs/design/spec_legomotion.md。
 
 结构：BEV Encoder（STPN 复用 motionnet.py）→ IaIE（式1-2）→ IeBE（早期式3-4 + 晚期式5-6）

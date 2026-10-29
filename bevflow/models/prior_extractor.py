@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """RVpE 积木：从旧代码 model/prior_extractor.py 搬运（SimplePositionEncoding /
 SineContinuousPositionalEncoding / DispEncoding / GridInsTransformer(ISA) /
 MaskedCrossAttention(PCA)）。行为保持，仅清理注释与死代码。

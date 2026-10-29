@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """训练薄入口。用法：
 python scripts/train.py --config configs/exp/R1A_official.yaml --set train.seed=1
 """

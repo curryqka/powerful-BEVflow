@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """路径唯一来源：环境变量优先，缺省值取 configs/paths.yaml 同款常量。"""
 import os
 

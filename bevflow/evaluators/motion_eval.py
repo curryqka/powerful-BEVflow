@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# 本文件派生自 MERL MotionNet（https://github.com/merlresearch/MotionNet）。
 """位移评测与分类评测。从上游 eval.py 的 eval_motion_displacement 搬运。
 
 - 协议 motionnet_v1：三档 static/slow/fast（0.2 m/s 门控，5/20 m/s 分箱），

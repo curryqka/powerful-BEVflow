@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# 注意：本文件在运行时依赖 AGPL-3.0-or-later 许可的 bevflow.models.motionnet 原语
+# （STPN/三头等，派生自 MERL MotionNet）。组合使用时的许可见 LICENSE。
 """LEGO-Motion 训练器（骨架复用 prior.py）。相对 multi_seq 的结构性差异只有两处：
 
 1. 训练前向走 teacher-forcing：把 scene_gt（cls 5ch + disp 2T ch + motion 2ch）传进模型

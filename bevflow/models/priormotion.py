@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# 注意：本文件在运行时依赖 AGPL-3.0-or-later 许可的 bevflow.models.motionnet 原语
+# （STPN/三头等，派生自 MERL MotionNet）。组合使用时的许可见 LICENSE。
 """PriorMotion（DSpG 部分）。从旧代码 powerfulmotion/model/ 逐行搬运。
 
 来源：model/priormotion.py 的 PriorMotionSTPN（:269-344）、MotionPredictionV2、FuturePrediction、

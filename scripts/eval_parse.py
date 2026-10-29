@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """解析上游 eval.py 写出的 eval_displacement.txt，生成 metrics.json（motionnet_v1 协议）。
 
 协议：每档 EPE 的 mean/median 取 5 个评测帧（0.2s 间隔，0.2-1.0s）上的均值；

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """扩展口径评测 CLI（D8）：空间分桶/x-y-径向-切向分解/实例稳定性。"""
 import argparse
 import os

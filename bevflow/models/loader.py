@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# 注意：本文件在运行时依赖 AGPL-3.0-or-later 许可的 bevflow.models.motionnet 原语
+# （STPN/三头等，派生自 MERL MotionNet）。组合使用时的许可见 LICENSE。
 """统一 ckpt 加载。官方权重与训练 ckpt 都是 DataParallel 键名（module. 前缀）。"""
 import torch
 from torch import nn

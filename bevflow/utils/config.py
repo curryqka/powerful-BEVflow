@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """配置体系：YAML + _base_ 继承 + 点号路径覆盖，不引入重型框架。
 
 - load_config(path)：解析 _base_（相对该文件所在 configs/ 目录），子键覆盖父键（dict 深合并）。
