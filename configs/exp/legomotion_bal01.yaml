@@ -1,0 +1,6 @@
+# LEGO mask_scale=0.01 敏感性点（第三档，0.03 vs 0.1 vs 0.01 三点定曲线）
+_base_: legomotion_bal.yaml
+run:
+  exp_id: LEGO
+loss:
+  mask_scale: 0.01
