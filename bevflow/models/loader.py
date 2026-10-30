@@ -11,7 +11,25 @@ HEIGHT_FEAT = 13
 
 
 def load_model(ckpt_path, device, name="motionnet"):
-    if name in ("priormotion", "priormotion_rvpe"):
+    if name == "legomotion":
+        import os
+
+        import yaml
+
+        from bevflow.models.legomotion.model import LegoMotion
+
+        snap = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(ckpt_path))),
+                            "config_snapshot.yaml")
+        mc = {}
+        if os.path.exists(snap):
+            with open(snap) as f:
+                mc = (yaml.safe_load(f) or {}).get("model", {}) or {}
+        model = nn.DataParallel(LegoMotion(
+            out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT,
+            dim=mc.get("dim", 64), n_queries=mc.get("n_queries", 256),
+            bev_scale=mc.get("bev_scale", 16),
+        ))
+    elif name in ("priormotion", "priormotion_rvpe"):
         import os
 
         import yaml
