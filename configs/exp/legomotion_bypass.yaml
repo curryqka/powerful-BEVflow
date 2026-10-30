@@ -1,0 +1,6 @@
+# A/B 实验 B：实例分支旁路（网格头吃 STPN 原始特征；IaIE/IeBE/掩码头保留）
+_base_: legomotion_bal.yaml
+run:
+  exp_id: LEGO
+model:
+  bypass_fusion: true

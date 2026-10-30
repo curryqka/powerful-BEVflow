@@ -120,6 +120,7 @@ def train_legomotion(cfg, run_dir):
         out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT,
         dim=cfg["model"].get("dim", 64), n_queries=cfg["model"].get("n_queries", 256),
         bev_scale=cfg["model"].get("bev_scale", 16),
+        bypass_fusion=cfg["model"].get("bypass_fusion", False),
     ))
     model = model.to(device)
     criterion = nn.SmoothL1Loss(reduction="none")

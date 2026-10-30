@@ -28,6 +28,7 @@ def load_model(ckpt_path, device, name="motionnet"):
             out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT,
             dim=mc.get("dim", 64), n_queries=mc.get("n_queries", 256),
             bev_scale=mc.get("bev_scale", 16),
+            bypass_fusion=mc.get("bypass_fusion", False),
         ))
     elif name in ("priormotion", "priormotion_rvpe"):
         import os

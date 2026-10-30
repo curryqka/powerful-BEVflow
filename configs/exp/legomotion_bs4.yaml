@@ -1,0 +1,7 @@
+# A/B 实验 A：论文配方纯 bs4（此前 bs2+累积2 的 BN 统计不一致）
+_base_: legomotion_bal.yaml
+run:
+  exp_id: LEGO
+train:
+  batch_size: 4
+  accum_steps: 1

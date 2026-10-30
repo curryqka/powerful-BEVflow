@@ -119,9 +119,11 @@ class MaskHead(nn.Module):
 
 class LegoMotion(nn.Module):
     def __init__(self, out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT,
-                 dim=64, n_queries=256, bev_scale=16, nheads=4, use_checkpoint=False):
+                 dim=64, n_queries=256, bev_scale=16, nheads=4, use_checkpoint=False,
+                 bypass_fusion=False):
         super().__init__()
         self.out_seq_len = out_seq_len
+        self.bypass_fusion = bypass_fusion
         self.stpn = STPN(height_feat_size=height_feat_size)
         self.iaie = IaIE(dim=dim, n_queries=n_queries, scale=bev_scale, nheads=nheads)
         self.iebe = IeBE(dim=dim, nheads=nheads)
@@ -136,7 +138,7 @@ class LegoMotion(nn.Module):
         x = self.stpn(bevs)                       # (B, 32, 256, 256)
         ins = self.iaie(x)                        # (B, N, D)
         e = self.iebe(x, ins)                     # (B, D, 256, 256)
-        g = self.to_grid(e)                       # (B, 32, 256, 256)
+        g = x if self.bypass_fusion else self.to_grid(e)  # 旁路时网格头直吃 STPN 特征（32ch）
 
         disp = self.motion_pred(g)
         disp = disp.reshape(-1, 2, 256, 256)
