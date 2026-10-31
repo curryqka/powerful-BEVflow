@@ -117,13 +117,36 @@ class MaskHead(nn.Module):
         return masks, self.cls_head(ins_feat)
 
 
+class MaskBroadcast(nn.Module):
+    """软掩码广播：以预测掩码为空间权重，把实例 embedding 散布回 BEV 网格。
+
+    masks: (B,N,HW) logits；ins: (B,N,D) → (B,32,H,W)。
+    每个像素按所有实例的掩码权重加权平均，再 1×1 投影到网格特征空间。
+    相比全图 cross-attention，实例信息只落在自己的掩码区域上，不会被平均稀释。
+    """
+
+    def __init__(self, dim, out_ch=32):
+        super().__init__()
+        self.proj = nn.Conv2d(dim, out_ch, kernel_size=1)
+
+    def forward(self, masks, ins):
+        b, n, hw = masks.shape
+        side = int(hw ** 0.5)
+        weight = masks.sigmoid().view(b, n, side, side)          # (B,N,H,W)
+        feat = torch.einsum("bnhw,bnd->bdhw", weight, ins)       # (B,D,H,W)
+        denom = weight.sum(dim=1, keepdim=True) + 1e-3
+        return self.proj(feat / denom)
+
+
 class LegoMotion(nn.Module):
     def __init__(self, out_seq_len=20, motion_category_num=2, height_feat_size=HEIGHT_FEAT,
                  dim=64, n_queries=256, bev_scale=16, nheads=4, use_checkpoint=False,
-                 bypass_fusion=False):
+                 bypass_fusion=False, fusion="paper", mask_detach=False):
         super().__init__()
         self.out_seq_len = out_seq_len
         self.bypass_fusion = bypass_fusion
+        self.fusion = fusion
+        self.mask_detach = mask_detach
         self.stpn = STPN(height_feat_size=height_feat_size)
         self.iaie = IaIE(dim=dim, n_queries=n_queries, scale=bev_scale, nheads=nheads)
         self.iebe = IeBE(dim=dim, nheads=nheads)
@@ -132,15 +155,28 @@ class LegoMotion(nn.Module):
         self.motion_pred = MotionPrediction(seq_len=out_seq_len)
         self.state_classify = StateEstimation(motion_category_num=motion_category_num)
         self.mask_head = MaskHead(dim=dim)
+        if fusion == "enhance":
+            self.mask_bcast = MaskBroadcast(dim)
+            # 零初始化门控：训练起点严格等价于旁路（网格头只吃 STPN 特征），
+            # 增强项学不到有用信号时不会伤害基线；学好后按通道"加分"。
+            self.enh_gate = nn.Parameter(torch.zeros(1, 32, 1, 1))
 
     def forward(self, bevs):
         bevs = bevs.permute(0, 1, 4, 2, 3)
         x = self.stpn(bevs)                       # (B, 32, 256, 256)
-        ins = self.iaie(x)                        # (B, N, D)
-        e = self.iebe(x, ins)                     # (B, D, 256, 256)
-        g = x if self.bypass_fusion else self.to_grid(e)  # 旁路时网格头直吃 STPN 特征（32ch）
+        x_ins = x.detach() if self.mask_detach else x
+        ins = self.iaie(x_ins)                    # (B, N, D)
+        e = self.iebe(x_ins, ins)                 # (B, D, 256, 256)
+        masks, classes = self.mask_head(ins, self.iebe.proj_bev(x_ins))
+
+        if self.fusion == "enhance":
+            delta = self.to_grid(e) + self.mask_bcast(masks, ins)
+            g = x + self.enh_gate * delta
+        elif self.bypass_fusion:
+            g = x                                 # 旁路：网格头直吃 STPN 特征（32ch）
+        else:
+            g = self.to_grid(e)
 
         disp = self.motion_pred(g)
         disp = disp.reshape(-1, 2, 256, 256)
-        masks, classes = self.mask_head(ins, self.iebe.proj_bev(x))
         return disp, self.cell_classify(g), self.state_classify(g), masks, classes

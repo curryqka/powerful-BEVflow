@@ -29,6 +29,8 @@ def load_model(ckpt_path, device, name="motionnet"):
             dim=mc.get("dim", 64), n_queries=mc.get("n_queries", 256),
             bev_scale=mc.get("bev_scale", 16),
             bypass_fusion=mc.get("bypass_fusion", False),
+            fusion=mc.get("fusion", "paper"),
+            mask_detach=mc.get("mask_detach", False),
         ))
     elif name in ("priormotion", "priormotion_rvpe"):
         import os

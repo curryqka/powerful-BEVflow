@@ -121,6 +121,8 @@ def train_legomotion(cfg, run_dir):
         dim=cfg["model"].get("dim", 64), n_queries=cfg["model"].get("n_queries", 256),
         bev_scale=cfg["model"].get("bev_scale", 16),
         bypass_fusion=cfg["model"].get("bypass_fusion", False),
+        fusion=cfg["model"].get("fusion", "paper"),
+        mask_detach=cfg["model"].get("mask_detach", False),
     ))
     model = model.to(device)
     criterion = nn.SmoothL1Loss(reduction="none")

@@ -1,0 +1,8 @@
+# E2：enhance + mask_detach=true + mask 0.1 + bs4 —— 掩码学好、主干免疫，检验解耦后增强是否为正
+_base_: legomotion_enh.yaml
+run:
+  exp_id: LEGO
+model:
+  mask_detach: true
+loss:
+  mask_scale: 0.1

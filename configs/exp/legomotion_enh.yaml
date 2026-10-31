@@ -1,0 +1,24 @@
+# LEGO-Motion 增强融合变体（探索）：把"掩码特征"从干扰改成增强。
+# 设计（依据 A/B 与梯度探针）：
+#   1. 零初始化门控残差：g = x + gate * (to_grid(e) + MaskBroadcast(masks, ins))，
+#      gate 初始为 0 → 起点严格等价旁路 B；增强项学不到有用信号也不会伤害基线。
+#   2. 软掩码广播：用预测掩码作为空间权重把实例 embedding 散回网格，
+#      实例信息只落在自己的掩码区域，避免全图 cross-attention 的稀释。
+#   3. mask_scale 用当前最优 0.01；bs4（论文口径，单卡放得下）。
+#   4. mask_detach=false（默认端到端）；若仍见干扰可切 true 做梯度隔离对照。
+_base_: legomotion.yaml
+
+run:
+  exp_id: LEGO
+
+model:
+  fusion: enhance
+  mask_detach: false
+
+loss:
+  mask_scale: 0.01
+
+train:
+  batch_size: 4
+  accum_steps: 1
+  val_batch_size: 2
